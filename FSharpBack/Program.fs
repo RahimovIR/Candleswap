@@ -7,6 +7,7 @@ open System.Data.SQLite
 open System.Collections
 open System.Collections.Generic
 open Dapper
+open System.Timers
 
 module Requests = 
     
@@ -25,9 +26,9 @@ module Requests =
     
     let swapsQuery id = 
         $"""query q {{
-               swaps(orderBy: timestamp, orderDirection: desc, where:
-                {{ pair: "{id}" }}
-               ) {{
+               swaps(orderBy: timestamp, orderDirection: desc, 
+                     where:{{ pair: "{id}" }})
+                {{
                     amount0In
                     amount0Out
                     amount1In
@@ -93,11 +94,11 @@ module Requests =
     let takeSwaps idPair = idPair |> swapsQuery |> requestMaker |> deserialize |> mapSwaps
     let takeInfo idPair = idPair |> pairInfoQuery |> requestMaker |> deserialize |> mapPairInfo
     
-    "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11" |> takeSwaps |> allPr
+    //"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11" |> takeSwaps |> allPr
     //takeTop100 |> allPr 
 
 type Candle = { 
-    mutable datetime:DateTime; 
+    datetime:DateTime; 
     resolutionSeconds:int; 
     uniswapPairId:string;
     _open:decimal;
@@ -213,10 +214,10 @@ module Logic =
     let countSwapPrice(resBase: decimal, resQuote: decimal) = 
         resQuote / resBase
 
-    let buildCandle (swapsSlice: Requests.Swap list, res0: decimal, res1: decimal) = 
+    let buildCandle (swapsSlice: Requests.Swap list, res0: decimal, res1: decimal, uniswapPairId, datetime:DateTime, resolutionSeconds) = 
         let mutable currentRes0 = res0
         let mutable currentRes1 = res1
-        let mutable k = currentRes0 * currentRes1
+        let k = currentRes0 * currentRes1
         let mutable highPrice = 0 |> decimal
         let mutable lowPrice = Decimal.MaxValue
         let mutable openPrice = 0 |> decimal
@@ -231,9 +232,9 @@ module Logic =
             volume <- volume + ((s.amount1In + s.amount1Out) |> decimal)
         openPrice <- currentRes1 / currentRes0
         {
-            datetime = DateTime(1970, 01, 01);
-            resolutionSeconds = 60;
-            uniswapPairId = "";
+            datetime = datetime;
+            resolutionSeconds = resolutionSeconds;
+            uniswapPairId = uniswapPairId;
             _open = openPrice;
             high = highPrice;
             low = lowPrice;
@@ -241,32 +242,33 @@ module Logic =
             volume = volume;
         }
 
-    let getCandles(pairId: string, callback) = 
+    let getCandles(pairId: string, callback, resolutionSeconds) = 
         let pair = Requests.takeInfo(pairId)
         let res0 = pair.Value.reserve0 |> decimal
         let res1 = pair.Value.reserve1 |> decimal
-        let mutable currentTime = new DateTimeOffset(DateTime.UtcNow)
-        let mutable timeMinuteAgo = currentTime.AddMinutes(-1 |> float)
+        let currentTime = new DateTimeOffset(DateTime.UtcNow)
+        let timeMinuteAgo = currentTime.AddSeconds(-resolutionSeconds |> float)
         
-        let mutable candles = []
-        while true do
-            let currentSwaps = (pairId |> Requests.takeSwaps).Value
-            let candle = buildCandle(getSwapsInScope(
+        let currentSwaps = (pairId |> Requests.takeSwaps).Value
+        let candle = buildCandle(getSwapsInScope(
                                         currentSwaps, 
                                         timeMinuteAgo.ToUnixTimeSeconds(), 
-                                        currentTime.ToUnixTimeSeconds()), res0, res1)
-            candle.datetime <- timeMinuteAgo.DateTime
-            candles <- candle :: candles
-            currentTime <- timeMinuteAgo
-            timeMinuteAgo <- currentTime.AddMinutes(-1 |> float)
-            let c = Seq.ofList candles
-            callback c
-            Seq.iter (DB.addCandle >> Async.RunSynchronously) c
-            Threading.Thread.Sleep(1000)
-        ()
+                                        currentTime.ToUnixTimeSeconds()), res0, res1, pairId, DateTime.UtcNow, resolutionSeconds)
+        callback candle
+        (DB.addCandle >> Async.RunSynchronously) candle
+        Threading.Thread.Sleep(1000)
+
+
 
 [<EntryPoint>]
 let main args =
     //Async.RunSynchronously <| asyncMain
-    let id = "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11"
-    (id, fun c -> printfn "%A" c) |> Logic.getCandles |> Requests.allPr
+    let id = "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852"
+    let timer = new Timer(20000.0)
+    let candlesHandler = new ElapsedEventHandler(fun obj args -> 
+                                                 (id, (fun c -> printfn "%A" c), timer.Interval / 1000.0 |> int)
+                                                 |> Logic.getCandles |> Requests.allPr)
+    timer.Elapsed.AddHandler(candlesHandler)
+    timer.Start()
+    while true do ()
+    0

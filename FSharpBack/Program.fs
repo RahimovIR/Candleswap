@@ -9,6 +9,9 @@ open System.Collections.Generic
 open Dapper
 open System.Timers
 open Nethereum.Web3
+open Nethereum.Hex.HexTypes
+open Nethereum.RPC.Eth.DTOs
+open System.Numerics
 
 module Requests = 
     
@@ -123,6 +126,11 @@ module DB =
         "update candles set open = @_open, high = @high, low = @low, close = @close, volume = @volume) " + 
         "values uniswapPairId = @uniswapPairId and resolutionSeconds = @resolutionSeconds and datetime = @datetime)"
 
+    let private getCandleByDatetimeSql =
+        "select datetime, resolutionSeconds, uniswapPairId, open, high, low, close, volume" + 
+        "from candles" +
+        "where datetime = @datetime"
+
     let inline (=>) k v = k, box v
 
     let private dbQuery<'T> (connection:SQLiteConnection) (sql:string) (parameters:IDictionary<string, obj> option) = 
@@ -147,43 +155,32 @@ module DB =
     let fetchCandlesTask (uniswapPairId:string) (resolutionSeconds:int) = Async.StartAsTask <| fetchCandles uniswapPairId resolutionSeconds
     let addCandle candle = 
         async {
-            let queryParams = dict [
-                    "datetime" => candle.datetime; 
-                    "resolutionSeconds" => candle.resolutionSeconds;
-                    "uniswapPairId" => candle.uniswapPairId;
-                    "open" => candle._open;
-                    "high" => candle.high;
-                    "low" => candle.low;
-                    "close" => candle.close;
-                    "volume" => candle.volume
-                    ]
-
             let! rowsChanged = Async.AwaitTask <| dbExecute connection insertCandleSql candle
             printfn "records added: %i" rowsChanged
         }
     
     let updateCandle candle = 
         async {
-            let queryParams = dict [
-                    "datetime" => candle.datetime; 
-                    "resolutionSeconds" => candle.resolutionSeconds;
-                    "uniswapPairId" => candle.uniswapPairId;
-                    "open" => candle._open;
-                    "high" => candle.high;
-                    "low" => candle.low;
-                    "close" => candle.close;
-                    "volume" => candle.volume
-                    ]
-
             let! rowsChanged = Async.AwaitTask <| dbExecute connection updateCandleSql candle
             printfn "records added: %i" rowsChanged
         }
+
+    let getCandleByDatetime datetime = 
+        async {
+            let queryParams = Some <| dict [
+                    "datetime" => datetime;
+                    ]
+
+            let! candle = Async.AwaitTask <| dbQuery connection getCandleByDatetimeSql queryParams
+            return candle
+        }
+
 
 module Logic = 
     let milisecondsInMinute = 60000
 
     let getSwapsInScope(swaps: Requests.Swap list, timestampAfter: int64, timestampBefore: int64) =
-        swaps |> List.filter(fun s -> s.timestamp > timestampAfter && s.timestamp < timestampBefore)
+        swaps |> List.filter(fun s -> s.timestamp >= timestampAfter && s.timestamp <= timestampBefore)
 
     let countSwapPrice(resBase: decimal, resQuote: decimal) = 
         resQuote / resBase
@@ -192,9 +189,6 @@ module Logic =
         let mutable currentRes0 = res0
         let mutable currentRes1 = res1
         let k = currentRes0 * currentRes1
-        (*let mutable highPrice = 0 |> decimal
-        let mutable lowPrice = Decimal.MaxValue
-        let mutable openPrice = 0 |> decimal*)
         let mutable closePrice = currentRes1 / currentRes0
         let mutable lowPrice = closePrice
         let mutable highPrice = closePrice
@@ -267,6 +261,90 @@ module Logic =
         Threading.Thread.Sleep(1000)
         ()
 
+module Dater =
+
+    type BlockNumberTimestamp = {
+        number:HexBigInteger;
+        timestamp:HexBigInteger;
+    }
+    
+    let getBlockNumberAndTimestampAsync (savedBlocks:Dictionary<HexBigInteger, HexBigInteger>) (web3: Web3) (blockNumber:HexBigInteger) = 
+        async {
+            let timestamp = ref (HexBigInteger "0")
+            if savedBlocks.TryGetValue(blockNumber, timestamp)
+            then return { number = blockNumber; timestamp = timestamp.Value}
+            else let! block =  Async.AwaitTask <|web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockNumber)
+                 savedBlocks.Add(blockNumber, block.Timestamp)
+                 return {number = blockNumber; timestamp = block.Timestamp}
+        }
+
+    let isBestBlock date predictedBlockTime previousBlockTime nextBlockTime ifBlockAfterDate = 
+        match ifBlockAfterDate with
+        | true -> if predictedBlockTime < date then false
+                  else if predictedBlockTime >= date && previousBlockTime < date then true
+                  else false
+        | false -> if predictedBlockTime > date then false
+                   else if predictedBlockTime <= date && nextBlockTime > date then true
+                   else false
+
+    let getNextPredictedBlockNumber currentPredictedBlockNumber skip = 
+        let nextPredictedBlockNumber = currentPredictedBlockNumber + skip
+        if nextPredictedBlockNumber <= 1I then 1I
+        else nextPredictedBlockNumber
+
+    let rec findBestBlock date predictedBlock ifBlockAfterDate
+                          blockTime savedBlocks checkedBlocks web3 =
+        async {
+            let! previousPredictedBlock = predictedBlock.number.Value - 1I
+                                          |> HexBigInteger
+                                          |> getBlockNumberAndTimestampAsync savedBlocks web3
+            let! nextPredictedBlock = predictedBlock.number.Value + 1I
+                                      |> HexBigInteger
+                                      |> getBlockNumberAndTimestampAsync savedBlocks web3
+
+            if isBestBlock date predictedBlock.timestamp.Value previousPredictedBlock.timestamp.Value 
+                             nextPredictedBlock.timestamp.Value ifBlockAfterDate
+            then return predictedBlock
+            else let difference = date - predictedBlock.timestamp.Value
+                 let mutable skip = (float difference) / blockTime
+                                    |> Math.Ceiling
+                 if skip = 0.0 then skip <- if difference < 0I then -1.0 else 1.0
+                 let! nextPredictedBlock = getNextPredictedBlockNumber predictedBlock.number.Value (BigInteger skip)
+                                           |> HexBigInteger
+                                           |> getBlockNumberAndTimestampAsync savedBlocks web3
+                 let newBlockTime = (predictedBlock.timestamp.Value - nextPredictedBlock.timestamp.Value)
+                                    / (predictedBlock.number.Value - nextPredictedBlock.number.Value)
+                                    |> float
+                                    |> Math.Abs
+                 return! findBestBlock date nextPredictedBlock ifBlockAfterDate newBlockTime savedBlocks checkedBlocks web3                                           
+        }
+
+    let getBlockByDateAsync ifBlockAfterDate (web3: Web3) date =
+        async {
+            let savedBlocks = new Dictionary<HexBigInteger, HexBigInteger>()
+            let checkedBlocks = new List<BigInteger>()
+            let! latestBlockNumber = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync() |> Async.AwaitTask
+            let! latestBlock =  getBlockNumberAndTimestampAsync savedBlocks web3 latestBlockNumber
+            let firstBlockNumber = HexBigInteger 1I
+            let! firstBlock = getBlockNumberAndTimestampAsync savedBlocks web3 firstBlockNumber
+            let blockTime = (float (latestBlock.timestamp.Value - firstBlock.timestamp.Value))
+                            / (float (latestBlock.number.Value - 1I))
+            
+            if date <= firstBlock.timestamp.Value then return firstBlock
+            else if date >= latestBlock.timestamp.Value then return latestBlock
+            else let! predictedBlock = (float (date - firstBlock.timestamp.Value)) / blockTime
+                                       |> Math.Ceiling
+                                       |> BigInteger
+                                       |> HexBigInteger
+                                       |> getBlockNumberAndTimestampAsync savedBlocks web3
+                 return! findBestBlock date predictedBlock ifBlockAfterDate blockTime savedBlocks checkedBlocks web3
+        }
+
+    let convertToUnixTimestamp (date:DateTime) =
+        let origin = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+        let diff = date.ToUniversalTime() - origin
+        Math.Floor(diff.TotalSeconds)
+
 
 [<EntryPoint>]
 let main args =
@@ -279,7 +357,18 @@ let main args =
     timer.Elapsed.AddHandler(candlesHandler)
     timer.Start()
     while true do ()*)
-    let id = "0x1fbf001792e8cc747a5cb4aedf8c26b7421147e7"
+    (*let id = "0x1fbf001792e8cc747a5cb4aedf8c26b7421147e7"
     let resolutionTime = new TimeSpan(1, 1, 30)
-    (id, (fun c -> printfn "%A" c), resolutionTime) |> Logic.getCandles |> Requests.allPr
+    (id, (fun c -> printfn "%A" c), resolutionTime) |> Logic.getCandles |> Requests.allPr*)
+    let web3 = new Web3("https://still-dark-waterfall.quiknode.pro/9996011103848e330184be31732e5fa9d14de55a/")
+    let date = new DateTime(2016, 07, 20, 13, 20, 40)
+
+    let bl = date
+             |> Dater.convertToUnixTimestamp
+             |> BigInteger
+             |> Dater.getBlockByDateAsync false web3
+             |> Async.RunSynchronously
+    let block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(bl.number)
+    printfn "%A" (Dater.convertToUnixTimestamp date)
+    printfn "%A" bl.timestamp.Value
     0

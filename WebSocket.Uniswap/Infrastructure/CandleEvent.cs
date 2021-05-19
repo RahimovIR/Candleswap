@@ -24,8 +24,9 @@ namespace WebSocket.Uniswap.Infrastructure
                 EventsInvoked.Add((uniswapId, resolutionSeconds));
             }
             var fsharpFunc = FuncConvert.ToFSharpFunc<IEnumerable<global::Program.Candle>>(t=>candles(t));
-            var backgroundJob = Task.Run(() => global::Program.Logic.getCandles(uniswapId, fsharpFunc, resolutionSeconds));
-            return backgroundJob;
+            /*var backgroundJob = Task.Run(() => global::Program.Logic.getCandles(uniswapId, fsharpFunc, resolutionSeconds));
+            return backgroundJob;*/
+            return null;
         }
     }
 }

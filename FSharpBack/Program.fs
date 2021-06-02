@@ -15,18 +15,17 @@ open System.Numerics
 
 module Requests = 
     
-    let top100Query =
+    let pairsQuery =
         """query q {
-               pairs(first: 100, orderBy: reserveUSD, orderDirection: desc) {
-                 id
-                 token0{
-                   symbol
-                 }
-                 token1{
-                   symbol
-                 }
+               pairs(orderBy: reserveUSD, orderDirection: desc) {
+                   token0{
+                       id
+                   }
+                   token1{
+                       id
+                   }
                }
-              }"""
+          }"""
     
     let swapsQuery id = 
         $"""query q {{
@@ -63,11 +62,11 @@ module Requests =
     
     type Swap = { id: string; amount0In: float; amount0Out: float; amount1In:float; amount1Out: float; timestamp: int64 } 
     type PairInfo = { reserve0: float; reserve1: float; price0: float; price1: float }
+    type Pair = {token0Id: string; token1Id:string}
     
-    let mapTop100 (token: JToken Option) =
+    let mapPairs (token: JToken Option) =
         let mapper (token : JProperty) =
-            let strConcat x y = x + "/" + y
-            token.Value.["pairs"] |> Seq.map (fun x -> ((x.["id"].ToString()), strConcat (x.["token0"].["symbol"].ToString()) (x.["token1"].["symbol"].ToString())))
+            token.Value.["pairs"] |> Seq.map (fun x -> {token0Id = x.["token0"].["id"].ToString(); token1Id = x.["token1"].["id"].ToString()})
         match token with
         |Some token -> token.Children<JProperty>() |> Seq.last |> mapper |> List.ofSeq |> Some
         |None -> None
@@ -94,7 +93,7 @@ module Requests =
     
     let allPr x = printfn "%A" x
    
-    let takeTop100 = top100Query |> requestMaker |> deserialize |> mapTop100
+    let takePairs () = pairsQuery |> requestMaker |> deserialize |> mapPairs
     let takeSwaps idPair = idPair |> swapsQuery |> requestMaker |> deserialize |> mapSwaps
     let takeInfo idPair = idPair |> pairInfoQuery |> requestMaker |> deserialize |> mapPairInfo
 
@@ -360,15 +359,21 @@ let main args =
     (*let id = "0x1fbf001792e8cc747a5cb4aedf8c26b7421147e7"
     let resolutionTime = new TimeSpan(1, 1, 30)
     (id, (fun c -> printfn "%A" c), resolutionTime) |> Logic.getCandles |> Requests.allPr*)
-    let web3 = new Web3("https://still-dark-waterfall.quiknode.pro/9996011103848e330184be31732e5fa9d14de55a/")
-    let date = new DateTime(2016, 07, 20, 13, 20, 40)
+    (*let web3 = new Web3("https://still-dark-waterfall.quiknode.pro/9996011103848e330184be31732e5fa9d14de55a/")
+    let date = new DateTime(2020, 10, 20, 13, 20, 41)
 
     let bl = date
              |> Dater.convertToUnixTimestamp
              |> BigInteger
-             |> Dater.getBlockByDateAsync false web3
+             |> Dater.getBlockByDateAsync true web3
              |> Async.RunSynchronously
-    let block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(bl.number)
+    async{
+        let! block = Async.AwaitTask <| web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(bl.number)
+        Array.iter (fun transaction -> printfn "%A" transaction.) block.Transactions
+        
+    } |> Async.RunSynchronously
     printfn "%A" (Dater.convertToUnixTimestamp date)
-    printfn "%A" bl.timestamp.Value
+    printfn "%A" bl.number.Value*)
+    let t = Requests.takePairs()
+    printf "%A" t
     0

@@ -13,20 +13,7 @@ open Nethereum.Hex.HexTypes
 open Nethereum.RPC.Eth.DTOs
 open System.Numerics
 
-module Requests = 
-    
-    let pairsQuery =
-        """query q {
-               pairs(orderBy: reserveUSD, orderDirection: desc) {
-                   token0{
-                       id
-                   }
-                   token1{
-                       id
-                   }
-               }
-          }"""
-    
+module Requests =    
     let swapsQuery id = 
         $"""query q {{
                swaps(orderBy: timestamp, orderDirection: desc, 
@@ -47,6 +34,12 @@ module Requests =
                    reserve1
                    token0Price
                    token1Price
+                   token0{{
+                       id
+                   }}
+                   token1{{
+                       id
+                   }}
                }}
               }}"""
     
@@ -61,15 +54,7 @@ module Requests =
         GraphQLClient.sendRequest connection request
     
     type Swap = { id: string; amount0In: float; amount0Out: float; amount1In:float; amount1Out: float; timestamp: int64 } 
-    type PairInfo = { reserve0: float; reserve1: float; price0: float; price1: float }
-    type Pair = {token0Id: string; token1Id:string}
-    
-    let mapPairs (token: JToken Option) =
-        let mapper (token : JProperty) =
-            token.Value.["pairs"] |> Seq.map (fun x -> {token0Id = x.["token0"].["id"].ToString(); token1Id = x.["token1"].["id"].ToString()})
-        match token with
-        |Some token -> token.Children<JProperty>() |> Seq.last |> mapper |> List.ofSeq |> Some
-        |None -> None
+    type PairInfo = { reserve0: float; reserve1: float; price0: float; price1: float; token0Id: string; token1Id:string }
       
     let mapSwaps (token: JToken Option) =
         let mapper (token : JProperty) =
@@ -81,7 +66,14 @@ module Requests =
     let mapPairInfo (token: JToken Option) =
         let mapper (token : JProperty) =
             let info = token.Value.["pair"]
-            { reserve0 = (float info.["reserve0"]); reserve1 = (float info.["reserve1"]); price0 = (float info.["token0Price"]); price1 = (float info.["token1Price"]) } 
+            { 
+                reserve0 = (float info.["reserve0"]);
+                reserve1 = (float info.["reserve1"]); 
+                price0 = (float info.["token0Price"]); 
+                price1 = (float info.["token1Price"]);
+                token0Id = info.["token0"].["id"].ToString();
+                token1Id = info.["token1"].["id"].ToString();
+            } 
         match token with
         |Some token -> token.Children<JProperty>() |> Seq.last |> mapper |> Some
         |None -> None
@@ -92,10 +84,9 @@ module Requests =
         else data |> JToken.Parse |> Some
     
     let allPr x = printfn "%A" x
-   
-    let takePairs () = pairsQuery |> requestMaker |> deserialize |> mapPairs
+
     let takeSwaps idPair = idPair |> swapsQuery |> requestMaker |> deserialize |> mapSwaps
-    let takeInfo idPair = idPair |> pairInfoQuery |> requestMaker |> deserialize |> mapPairInfo
+    let takePairInfo idPair = idPair |> pairInfoQuery |> requestMaker |> deserialize |> mapPairInfo
 
 type Candle = { 
     datetime:DateTime; 
@@ -214,7 +205,7 @@ module Logic =
                     }
 
     let getCandle(pairId: string, callback, resolutionTime:TimeSpan) = 
-        let pair = Requests.takeInfo(pairId)
+        let pair = Requests.takePairInfo(pairId)
         let res0 = pair.Value.reserve0 |> decimal
         let res1 = pair.Value.reserve1 |> decimal
         let resolutionSeconds = (int)resolutionTime.TotalSeconds
@@ -236,7 +227,7 @@ module Logic =
         Threading.Thread.Sleep(1000)
 
     let getCandles(pairId: string, callback, resolutionTime:TimeSpan) = 
-        let pair = Requests.takeInfo(pairId)
+        let pair = Requests.takePairInfo(pairId)
         let res0 = pair.Value.reserve0 |> decimal
         let res1 = pair.Value.reserve1 |> decimal
         let resolutionSeconds = (int)resolutionTime.TotalSeconds
@@ -374,6 +365,6 @@ let main args =
     } |> Async.RunSynchronously
     printfn "%A" (Dater.convertToUnixTimestamp date)
     printfn "%A" bl.number.Value*)
-    let t = Requests.takePairs()
+    let t = Requests.takePairInfo "0x1fbf001792e8cc747a5cb4aedf8c26b7421147e7"
     printf "%A" t
     0

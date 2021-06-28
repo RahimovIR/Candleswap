@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Abi\Router.abi" />
+    <None Include="Binaries\Router.bin" />
+    <Compile Include="Library.fs" />
+    <Compile Include="Router\ContractDefinition\ExactInputParams.fs" />
+    <Compile Include="Router\ContractDefinition\ExactInputSingleParams.fs" />
+    <Compile Include="Router\ContractDefinition\ExactOutputParams.fs" />
+    <Compile Include="Router\ContractDefinition\ExactOutputSingleParams.fs" />
+    <Compile Include="Router\ContractDefinition\RouterDefinition.fs" />
+    <Compile Include="Router\RouterService.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
+  </ItemGroup>
+
+</Project>

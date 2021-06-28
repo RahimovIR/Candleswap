@@ -32,8 +32,8 @@ type MyGenerators =
 [<Fact>]
 let ``Idempotency of getting swaps in scope``() =
     let getSwapsInScopeIsIdempotent swaps timestampAfter timestampBefore = 
-        let firstGet = getSwapsInScope (swaps, timestampAfter, timestampBefore)
-        let secondGet = getSwapsInScope (swaps, timestampAfter, timestampBefore)
+        let firstGet = filterSwapsInScope (swaps, timestampAfter, timestampBefore)
+        let secondGet = filterSwapsInScope (swaps, timestampAfter, timestampBefore)
         List.forall2 (fun first second -> first.timestamp = second.timestamp) firstGet secondGet
     do Arb.register<MyGenerators>() |> ignore
     Check.QuickThrowOnFailure getSwapsInScopeIsIdempotent
@@ -41,7 +41,7 @@ let ``Idempotency of getting swaps in scope``() =
 [<Fact>]
 let ``n swap timestamp always less than n-1 or equal``() =
     let swapsTimestampProperty swaps timestampAfter timestampBefore =
-        let swapPairs = getSwapsInScope (swaps, timestampAfter, timestampBefore) |> List.pairwise
+        let swapPairs = filterSwapsInScope (swaps, timestampAfter, timestampBefore) |> List.pairwise
         List.forall(fun (n, ``n + 1``) -> n.timestamp <= ``n + 1``.timestamp) swapPairs
     do Arb.register<MyGenerators>() |> ignore
     Check.Quick swapsTimestampProperty

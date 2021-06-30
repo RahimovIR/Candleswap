@@ -107,6 +107,7 @@ type Candle = {
     volume:uint;
 }
 
+[<CLIMutable>]
 type DBCandle = {
     datetime:DateTime; 
     resolutionSeconds:int; 
@@ -155,7 +156,7 @@ module DB =
         async {            
             let! candles = 
                 Async.AwaitTask <| 
-                dbQuery<Candle> connection fetchCandlesSql 
+                dbQuery<DBCandle> connection fetchCandlesSql 
                     (Some(dict [ "uniswapPairId" => uniswapPairId; "resolutionSeconds" => resolutionSeconds ]))
 
             return candles

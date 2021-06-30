@@ -13,7 +13,7 @@ open Nethereum.ABI.FunctionEncoding.Attributes
             [<Parameter("address", "tokenOut", 2)>]
             member val public TokenOut = Unchecked.defaultof<string> with get, set
             [<Parameter("uint24", "fee", 3)>]
-            member val public Fee = Unchecked.defaultof<bigint> with get, set //Change here
+            member val public Fee = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("address", "recipient", 4)>]
             member val public Recipient = Unchecked.defaultof<string> with get, set
             [<Parameter("uint256", "deadline", 5)>]

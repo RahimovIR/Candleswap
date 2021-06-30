@@ -6,7 +6,6 @@ open System.Collections.Generic
 open System.Numerics
 open Nethereum.Hex.HexTypes
 open Nethereum.ABI.FunctionEncoding.Attributes
-open Nethereum.Util
 
     type ExactOutputParams() =
             [<Parameter("bytes", "path", 1)>]

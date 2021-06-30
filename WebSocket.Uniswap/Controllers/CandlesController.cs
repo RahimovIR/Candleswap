@@ -18,24 +18,35 @@ namespace WebSocket.Uniswap.Controllers
     {
         [HttpGet()]
         public async Task<object> GetHistoricalCandles([FromQuery] string symbol,
-            [FromQuery] string interval,
-            [FromQuery] long startTime,
-            [FromQuery] long endTime,
-            [FromQuery] int limit)
+            [FromQuery] int periodSeconds,
+            [FromQuery] long? startTime,
+            [FromQuery] long? endTime,
+            [FromQuery] int? limit)
         {
             if (string.IsNullOrEmpty(symbol))
             {
                 return BadRequest("A symbol should be provided");
             }
 
-            if (string.IsNullOrEmpty(interval))
+            if (periodSeconds == default)
             {
                 return BadRequest("An interval should be provided");
             }
 
-            var candles = await global::Program.DB.fetchCandlesTask(symbol, limit);
+            var startDateTime = startTime == null 
+                ? DateTimeOffset.MinValue.UtcDateTime
+                : DateTimeOffset.FromUnixTimeSeconds(startTime.Value).UtcDateTime;
+            var endDateTime = endTime == null 
+                ? DateTimeOffset.MaxValue.UtcDateTime
+                : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;
+            limit ??= 10;
 
-            return candles;
+            var candles = await global::Program.DB.fetchCandlesTask(symbol, periodSeconds);
+
+            return candles.Where(c => c.datetime.ToUniversalTime() >= startDateTime 
+            && c.datetime.ToUniversalTime() <= endDateTime)
+                .OrderByDescending(c => c.datetime)
+                .Take(limit.Value);
         }
     }
 }

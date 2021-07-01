@@ -5,11 +5,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Abi\MystToken.abi" />
     <None Include="Abi\Path.abi" />
     <None Include="Abi\Router.abi" />
+    <None Include="Binaries\MystToken.bin" />
     <None Include="Binaries\Path.bin" />
     <None Include="Binaries\Router.bin" />
     <Compile Include="Library.fs" />
+    <Compile Include="MystToken\ContractDefinition\MystTokenDefinition.fs" />
+    <Compile Include="MystToken\MystTokenService.fs" />
     <Compile Include="Path\ContractDefinition\PathDefinition.fs" />
     <Compile Include="Path\PathService.fs" />
     <Compile Include="Router\ContractDefinition\ExactInputParams.fs" />

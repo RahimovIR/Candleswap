@@ -22,15 +22,15 @@ open System.Threading
         new() = PathDeployment(BYTECODE)
         
 
-    [<FunctionOutput>]
-    type DecodeFirstPoolOutputDTO() =
-        inherit FunctionOutputDTO() 
-            [<Parameter("address", "tokenA", 1)>]
-            member val public TokenA = Unchecked.defaultof<string> with get, set
-            [<Parameter("address", "tokenB", 2)>]
-            member val public TokenB = Unchecked.defaultof<string> with get, set
-            [<Parameter("uint24", "fee", 3)>]
-            member val public Fee = Unchecked.defaultof<BigInteger> with get, set    
+     [<FunctionOutput>]
+     type DecodeFirstPoolOutputDTO() =
+         inherit FunctionOutputDTO() 
+             [<Parameter("address", "tokenA", 1)>]
+             member val public TokenA = Unchecked.defaultof<string> with get, set
+             [<Parameter("address", "tokenB", 2)>]
+             member val public TokenB = Unchecked.defaultof<string> with get, set
+             [<Parameter("uint24", "fee", 3)>]
+             member val public Fee = Unchecked.defaultof<BigInteger> with get, set   
     
     [<Function("decodeFirstPool", typeof<DecodeFirstPoolOutputDTO>)>]
     type DecodeFirstPoolFunction() = 
@@ -70,6 +70,7 @@ open System.Threading
     
             [<Parameter("bytes", "path", 1)>]
             member val public Path = Unchecked.defaultof<byte[]> with get, set
+        
         
     
     [<FunctionOutput>]

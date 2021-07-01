@@ -23,6 +23,7 @@ open Contracts.Path.ContractDefinition
 open System.Diagnostics
 open Nethereum.Util
 open System.IO
+open Contracts.MystToken.ContractDefinition
 
 
 
@@ -199,7 +200,7 @@ module Dater =
             let timestamp = ref (HexBigInteger "0")
             if savedBlocks.TryGetValue(blockNumber, timestamp)
             then return { number = blockNumber; timestamp = timestamp.Value}
-            else printfn "blockNumber=%A" blockNumber.Value 
+            else //printfn "blockNumber=%A" blockNumber.Value 
                  let! block =  Async.AwaitTask <|web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockNumber)
                  savedBlocks.Add(blockNumber, block.Timestamp)
                  return {number = blockNumber; timestamp = block.Timestamp}
@@ -388,10 +389,11 @@ module Logic =
             let token0Id = pair.token0Id
             let token1Id = pair.token1Id
             let resolutionSeconds = (int)resolutionTime.TotalSeconds
-            let currentTime = new DateTimeOffset(DateTime.Now)
+            let currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
             let resolutionTimeAgo = currentTime.Subtract(resolutionTime)
-            let! blockNumberHex = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync() |> Async.AwaitTask
-            let mutable blockNumber = blockNumberHex.Value
+            let mutable blockNumber = TimeZoneInfo.ConvertTimeToUtc(currentTime.DateTime)
+                                      |> DateTimeOffset
+                                      |> getBlockNumberByDate web3
             let extremeBlockNumber = (currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3) - 1I
 
             let mutable closePrice =  BigDecimal(0I, 0)
@@ -449,16 +451,19 @@ module Logic =
             let token0Id = pair.token0Id
             let token1Id = pair.token1Id
             let resolutionSeconds = (int)resolutionTime.TotalSeconds
-            let mutable currentTime = new DateTimeOffset(DateTime.Now)
+            let mutable currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
             let mutable resolutionTimeAgo = currentTime.Subtract(resolutionTime)
             let mutable closePrice =  BigDecimal(0I, 0)
             let mutable lowPrice = BigDecimal.Parse maxUInt256StringRepresentation
             let mutable highPrice = BigDecimal(0I, 0)
             let mutable openPrice = BigDecimal(0I, 0)
             let mutable volume = 0u
-            let! blockNumberHex = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync() |> Async.AwaitTask
-            let mutable blockNumber = blockNumberHex.Value
-            let mutable extremeBlockNumber = currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3
+            
+            let mutable blockNumber = TimeZoneInfo.ConvertTimeToUtc(currentTime.DateTime)
+                                      |> DateTimeOffset
+                                      |> getBlockNumberByDate web3
+
+            let mutable extremeBlockNumber = (currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3) - 1I
             
             let mutable wasRequiredTransactionsInPeriodOfTime = false
             let mutable candle = None
@@ -521,7 +526,17 @@ module Logic =
                  blockNumber <- blockNumber - 1I     
             ()
         }
-        
+       
+type TransferEvent() = 
+    interface IEventDTO
+    [<Parameter("address", "_from", 1, true)>]
+    member val public From = Unchecked.defaultof<string> with get, set
+    [<Parameter("address", "_to", 2, true)>]
+    member val public To = Unchecked.defaultof<string> with get, set
+    [<Parameter("uint256", "_value", 3)>]
+    member val public Value = Unchecked.defaultof<BigInteger> with get, set
+
+            
 
 [<EntryPoint>]
 let main args =
@@ -529,18 +544,18 @@ let main args =
     let resolutionTime = new TimeSpan(0, 0, 10)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
 
-    let timer = new Timer(resolutionTime.TotalMilliseconds)
+    (*let timer = new Timer(resolutionTime.TotalMilliseconds)
     let candlesHandler = new ElapsedEventHandler(fun obj args -> 
                                                  (pairId, (fun c -> printfn "%A" c), resolutionTime, web3)
                                                  |> Logic.getCandle |> Async.RunSynchronously |> Requests.allPr)
     
     timer.Elapsed.AddHandler(candlesHandler)
     timer.Start()
-    while true do ()
+    while true do ()*)
 
     
     //let account = "0x80673EA7868A1fFBC5E4c05B461fEF389f841699".ToLower()
-    //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles |> Async.RunSynchronously |> Requests.allPr
+    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles |> Async.RunSynchronously |> Requests.allPr
     (*let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x781238dfa20f5f0090a2e3d516e54d91b91a3b6f1918ef0137016b3813ea0b80")
                       |> Async.AwaitTask
                       |> Async.RunSynchronously
@@ -562,9 +577,15 @@ let main args =
     let abiString = File.ReadAllText("..\..\..\..\Contracts\Abi\Path.abi")
     let binString = File.ReadAllText("..\..\..\..\Contracts\Binaries\Path.bin")*)
     (*
-    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x00bc0dcefbdd81ca0b0dd03ffe14d6318db9252e2cc8bd998efcee0b3909c134")
+    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x164adf133ab2cda84e70614d9512b21f98e74fa1ae3069b4f30372b431ea6419")
                       |> Async.AwaitTask
                       |> Async.RunSynchronously
-    let input = (Logic.decodeInputSingle transaction.Input).Params.AmountIn.ToString()
-    let output = (Logic.decodeOutputSingle transaction.Input).Params.AmountOut.ToString()*)
+    let handler = web3.Eth.GetContractTransactionHandler<TransferFunction>()//change on transfer
+    let paramss = new TransferFunction()
+    paramss.FromAddress <- "0xddc9e703595afc08fd5ad049c4c129804a003177"
+    paramss.Recipient <- "0x17c1916d8dca60f866c4d025ed05e66695d770a6"
+    paramss.Amount <- BigInteger 42366727345475519095m
+    
+    let transactionReceipt = handler.SendRequestAndWaitForReceiptAsync("0xe592427a0aece92de3edee1f18e0157c05861564", paramss) |> Async.AwaitTask |> Async.RunSynchronously
+    let transferEventOutput = transactionReceipt.DecodeAllEvents<TransferEvent>()*)
     0

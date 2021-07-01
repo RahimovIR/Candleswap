@@ -24,6 +24,7 @@ open System.Diagnostics
 open Nethereum.Util
 open System.IO
 open Contracts.MystToken.ContractDefinition
+open Nethereum.ABI
 
 
 
@@ -321,39 +322,46 @@ module Logic =
     let decodeInputSingle input = 
         (new ExactInputSingleFunction()).DecodeInput(input)
 
-    let decodeOutputSingle input = 
-        (new ExactOutputSingleFunction()).DecodeInput(input)
+    (*let decodeOutputSingle input = 
+        (new ExactOutputSingleFunction()).DecodeInput(input)*)
 
     let decodeInput input = 
         (new ExactInputFunction()).DecodeInput(input)
 
-    let decodeOutput input = 
-        (new ExactOutputFunction()).DecodeInput(input)
+    (*let decodeOutput input = 
+        (new ExactOutputFunction()).DecodeInput(input)*)
 
     let decodeFirstPool path = 
         (new DecodeFirstPoolFunction()).DecodeTransaction(path)
 
-    let getSingleInfoFromRouter (transaction:Transaction) =
+    let getSingleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) =
         let decodedInput = decodeInputSingle transaction.Input
-        let decodedOutput = decodeOutputSingle transaction.Input
-        (decodedInput.Params.TokenIn, decodedInput.Params.TokenOut, decodedInput.Params.AmountIn, decodedOutput.Params.AmountOut)
-    
-    let getSimpleInfoFromRouter (transaction: Transaction) = 
-        let decodedInput = decodeInput transaction.Input
-        let decodedOutput = decodeOutput transaction.Input
-        let t  = decodedOutput.Params.Path
-        ("", "",
-         decodedInput.Params.AmountIn, decodedOutput.Params.AmountOut)//maybe recipient, path
-    
-    let getInfoFromRouter transaction = 
-        try 
-            getSingleInfoFromRouter transaction
-        with
-            | :? System.NullReferenceException as ex when ex.TargetSite.Name = "getSingleInfoFromRouter" ->
-                 getSimpleInfoFromRouter transaction
+        let tokenIn = decodedInput.Params.TokenIn
+        let tokenOut = decodedInput.Params.TokenOut
+        if events.Count = 2
+        then let amountIn = events.[1].Event.Value
+             let amountOut = events.[0].Event.Value
+             (tokenIn, tokenOut, amountIn, amountOut)
+        else (tokenIn, tokenOut, 0I, 0I)//tokenIn,Out=null
 
-    let getInfoesFromExactInputSingleSwapRouterTransactions  (swapTransactions: Transaction[]) =
-        swapTransactions |> Array.map (fun swapTransaction -> getInfoFromRouter swapTransaction)
+    
+    let getSimpleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) = 
+        let decodedInput = decodeInput transaction.Input
+        let amountIn = events.[1].Event.Value
+        let amountOut = events.[2].Event.Value
+        ("", "", amountIn, amountOut)
+    
+    let getInfoFromRouterAsync (transaction:Transaction) (web3:Web3) =
+        async{
+            let! receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
+                           |> Async.AwaitTask
+            let events = receipt.Logs.DecodeAllEvents<TransferEventDTO>()
+            try
+                return getSingleInfoFromRouter transaction events
+            with
+            | :? System.NullReferenceException as ex when ex.TargetSite.Name = "getSingleInfoFromRouter" ->
+                return getSimpleInfoFromRouter transaction events
+        }
         
    (*
     let buildCandle (blockNumber:BigInteger) token0 token1 (web3:Web3) =
@@ -411,11 +419,11 @@ module Logic =
                 let transactions = block.Transactions
                 let swapTransactions = filterSwapTransactions transactions |> Array.rev
                 for swapTransaction in swapTransactions do
-                     let (tokenInAddress, tokenOutAddress, 
-                          amountIn, amountOut) = (getInfoFromRouter swapTransaction)
+                     let! (tokenInAddress, tokenOutAddress, 
+                           amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
                      if token0Id = tokenInAddress && token1Id = tokenOutAddress
                      then wasRequiredTransactionsInPeriodOfTime <- true
-                          let currentPrice = BigDecimal(amountOut, 0) / BigDecimal(amountIn, 0)
+                          let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
                           if firstIterFlag then closePrice <- currentPrice
                                                 firstIterFlag <- false
                           if (currentPrice > highPrice) then highPrice <- currentPrice
@@ -512,11 +520,12 @@ module Logic =
                  let transactions = block.Transactions
                  let swapTransactions = filterSwapTransactions transactions |> Array.rev
                  for swapTransaction in swapTransactions do
-                     let (tokenInAddress, tokenOutAddress, 
-                          amountIn, amountOut) = (getInfoFromRouter swapTransaction)
+                     let! (tokenInAddress, tokenOutAddress, 
+                           amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
+
                      if token0Id = tokenInAddress && token1Id = tokenOutAddress
                      then wasRequiredTransactionsInPeriodOfTime <- true
-                          let currentPrice = BigDecimal(amountOut, 0) / BigDecimal(amountIn, 0)
+                          let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
                           if firstIterflag then closePrice <- currentPrice
                                                 firstIterflag <- false
                           if (currentPrice > highPrice) then highPrice <- currentPrice
@@ -541,7 +550,7 @@ type TransferEvent() =
 [<EntryPoint>]
 let main args =
     let pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc"
-    let resolutionTime = new TimeSpan(0, 0, 10)
+    let resolutionTime = new TimeSpan(0, 30, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
 
     (*let timer = new Timer(resolutionTime.TotalMilliseconds)
@@ -577,15 +586,16 @@ let main args =
     let abiString = File.ReadAllText("..\..\..\..\Contracts\Abi\Path.abi")
     let binString = File.ReadAllText("..\..\..\..\Contracts\Binaries\Path.bin")*)
     (*
-    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x164adf133ab2cda84e70614d9512b21f98e74fa1ae3069b4f30372b431ea6419")
+    let transactionHash = "0x164adf133ab2cda84e70614d9512b21f98e74fa1ae3069b4f30372b431ea6419"
+    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
                       |> Async.AwaitTask
                       |> Async.RunSynchronously
-    let handler = web3.Eth.GetContractTransactionHandler<TransferFunction>()//change on transfer
-    let paramss = new TransferFunction()
-    paramss.FromAddress <- "0xddc9e703595afc08fd5ad049c4c129804a003177"
-    paramss.Recipient <- "0x17c1916d8dca60f866c4d025ed05e66695d770a6"
-    paramss.Amount <- BigInteger 42366727345475519095m
-    
-    let transactionReceipt = handler.SendRequestAndWaitForReceiptAsync("0xe592427a0aece92de3edee1f18e0157c05861564", paramss) |> Async.AwaitTask |> Async.RunSynchronously
-    let transferEventOutput = transactionReceipt.DecodeAllEvents<TransferEvent>()*)
+    let receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transactionHash)
+                  |> Async.AwaitTask
+                  |> Async.RunSynchronously
+    let events = receipt.Logs.DecodeAllEvents<TransferEventDTO>()
+    let amountIn = events.[0].Event.Value
+    let amountOut = events.[1].Event.Value
+    printfn "price=%A" <| BigInteger.Divide(amountIn,amountOut)*)
+
     0

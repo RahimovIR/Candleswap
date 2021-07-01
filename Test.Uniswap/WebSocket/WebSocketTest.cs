@@ -6,7 +6,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-/*
+
 namespace Test.Uniswap
 {
     [TestClass]
@@ -18,6 +18,7 @@ namespace Test.Uniswap
         public async Task GetCandles()
         {
             var buffer = new byte[1024 * 4];
+            string response = string.Empty;
 
             string request = @"{
                             ""event"": ""subscibe"",
@@ -31,6 +32,14 @@ namespace Test.Uniswap
 
             var bytes = Encoding.UTF8.GetBytes(request);
             await client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+
+            for (int i = 0; i < 10; i++)
+            {               
+
+                var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+                response = Encoding.UTF8.GetString(buffer, 0, result.Count).TrimEnd('\0').ToUpper();
+            }
         }
 
 
@@ -115,4 +124,3 @@ namespace Test.Uniswap
         #endregion
     }
 }
-*/

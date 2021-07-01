@@ -110,6 +110,7 @@ type Candle = {
     volume:uint;
 }
 
+[<CLIMutable>]
 type DBCandle = {
     datetime:DateTime; 
     resolutionSeconds:int; 

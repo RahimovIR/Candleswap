@@ -122,7 +122,7 @@ namespace WebSocket.Uniswap.Infrastructure
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
             int resolution = arrayKeyParam[1] == "1m" ? 60 : 60;
 
-            CandleEvent.GetCandles(arrayKeyParam[2], resolution);
+            CandleEvent.GetCandles(arrayKeyParam[2], c => Console.WriteLine(c), resolution);
 
             ReceiveText?.Invoke(this, webSocketMessage);
         }

@@ -555,7 +555,16 @@ let main args =
 
     
     //let account = "0x80673EA7868A1fFBC5E4c05B461fEF389f841699".ToLower()
-    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles |> Async.RunSynchronously |> Requests.allPr
+    let pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc"
+    let resolutionTime = new TimeSpan(0, 0, 5)
+    let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
+    let timer = new Timer(resolutionTime.TotalMilliseconds)
+    let candlesHandler = new ElapsedEventHandler(fun obj args -> 
+                                                 (pairId, (fun c -> printfn "%A" c), resolutionTime, web3)
+                                                 |> Logic.getCandle |> Async.RunSynchronously |> Requests.allPr)
+    timer.Elapsed.AddHandler(candlesHandler)
+    timer.Start()
+    while true do ()
     (*let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x781238dfa20f5f0090a2e3d516e54d91b91a3b6f1918ef0137016b3813ea0b80")
                       |> Async.AwaitTask
                       |> Async.RunSynchronously

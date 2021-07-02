@@ -201,8 +201,7 @@ module Dater =
             let timestamp = ref (HexBigInteger "0")
             if savedBlocks.TryGetValue(blockNumber, timestamp)
             then return { number = blockNumber; timestamp = timestamp.Value}
-            else //printfn "blockNumber=%A" blockNumber.Value 
-                 let! block =  Async.AwaitTask <|web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockNumber)
+            else let! block =  Async.AwaitTask <|web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockNumber)
                  savedBlocks.Add(blockNumber, block.Timestamp)
                  return {number = blockNumber; timestamp = block.Timestamp}
         }
@@ -286,35 +285,6 @@ module Logic =
 
     let countSwapPrice(resBase: decimal, resQuote: decimal) = 
         resQuote / resBase
-   (* 
-    let buildCandle transactions:Transaction[] = 
-        let mutable currentRes0 = res0
-        let mutable currentRes1 = res1
-        let k = currentRes0 * currentRes1
-        let mutable closePrice =  currentRes1 / currentRes0
-        let mutable lowPrice = closePrice
-        let mutable highPrice = closePrice
-        let mutable volume = 0m
-        for s in swapsSlice do
-            currentRes1 <- currentRes1 - ((s.amount1In + s.amount1Out) |> decimal)
-            currentRes0 <- k / currentRes1
-            let currentPrice = currentRes1 / currentRes0
-            if (currentPrice > highPrice) then highPrice <- currentPrice
-            if (currentPrice < lowPrice) then lowPrice <- currentPrice
-            volume <- volume + ((s.amount1In + s.amount1Out) |> decimal)
-        let openPrice = currentRes1 / currentRes0 
-        match swapsSlice.Length with
-        | 0 -> None
-        | _ -> Some ({
-                        datetime = datetime;
-                        resolutionSeconds = resolutionSeconds;
-                        uniswapPairId = uniswapPairId;
-                        _open = BigDecimal openPrice;
-                        high = BigDecimal highPrice;
-                        low = BigDecimal lowPrice;
-                        close = BigDecimal closePrice;
-                        volume = BigInteger volume;
-                    }, currentRes0, currentRes1)*)
 
     let filterSwapTransactions (transactions: Transaction[]) =
         transactions |> Array.filter (fun transaction -> transaction.To = routerAddress && transaction.Input <> "0x")
@@ -342,14 +312,19 @@ module Logic =
         then let amountIn = events.[1].Event.Value
              let amountOut = events.[0].Event.Value
              (tokenIn, tokenOut, amountIn, amountOut)
-        else (tokenIn, tokenOut, 0I, 0I)//tokenIn,Out=null
+        else ("", "", 0I, 0I)//tokenIn,Out=null
 
     
     let getSimpleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) = 
         let decodedInput = decodeInput transaction.Input
-        let amountIn = events.[1].Event.Value
-        let amountOut = events.[2].Event.Value
-        ("", "", amountIn, amountOut)
+        let tokenIn = "0x" + decodedInput.Params.Path.Slice(0, 20).ToHex()
+        //let second = decoded.Params.Path.Slice(23, 43).ToHex()
+        let tokenOut = "0x" + decodedInput.Params.Path.Slice(46, 66).ToHex()
+        if events.Count = 4
+        then let amountIn = events.[1].Event.Value
+             let amountOut = events.[2].Event.Value
+             (tokenIn, tokenOut, amountIn, amountOut)
+        else ("", "", 0I, 0I)
     
     let getInfoFromRouterAsync (transaction:Transaction) (web3:Web3) =
         async{
@@ -363,26 +338,43 @@ module Logic =
                 return getSimpleInfoFromRouter transaction events
         }
         
-   (*
-    let buildCandle (blockNumber:BigInteger) token0 token1 (web3:Web3) =
+   
+    let buildCandleAsync (blockNumber:BigInteger) token0Id token1Id (candle:Candle) wasRequiredTransactionsInPeriodOfTime
+                         firstIterFlag (web3:Web3) =
         async{
-            let! block = Async.AwaitTask <| web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(HexBigInteger blockNumber)
+            let mutable closePrice =  candle.close
+            let mutable lowPrice = candle.low
+            let mutable highPrice = candle.high
+            let mutable openPrice = candle._open
+            let mutable volume = candle.volume
+            let mutable _wasRequiredTransactionsInPeriodOfTime = wasRequiredTransactionsInPeriodOfTime
+            let mutable _firstIterFlag = firstIterFlag
+
+            let! block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(HexBigInteger blockNumber)
+                         |> Async.AwaitTask
             let transactions = block.Transactions
             let swapTransactions = filterSwapTransactions transactions |> Array.rev
             for swapTransaction in swapTransactions do
-                let (tokenInAddress, tokenOutAddress, 
-                     amountIn, amountOut) = (getInfoFromRouter swapTransaction)
+                let! (tokenInAddress, tokenOutAddress, 
+                      amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
                 if token0Id = tokenInAddress && token1Id = tokenOutAddress
-                then wasRequiredTransactionsInPeriodOfTime <- true
-                     let currentPrice = BigDecimal(amountOut, 0) / BigDecimal(amountIn, 0)
-                     if firstIterflag then closePrice <- currentPrice
-                                           firstIterflag <- false
+                then _wasRequiredTransactionsInPeriodOfTime <- true
+                     printfn "%s" swapTransaction.TransactionHash
+                     let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
+                     if _firstIterFlag then closePrice <- currentPrice
+                                            _firstIterFlag <- false
                      if (currentPrice > highPrice) then highPrice <- currentPrice
                      if (currentPrice < lowPrice) then lowPrice <- currentPrice
                      openPrice <- currentPrice
                      volume <- volume + 1u
-            blockNumber <- blockNumber - 1I    
-        }*)
+            return ({ 
+                close = closePrice;
+                low = lowPrice;
+                high = highPrice;
+                _open = openPrice;
+                volume = volume;
+            }, blockNumber - 1I, _wasRequiredTransactionsInPeriodOfTime, _firstIterFlag)
+        }
 
     let getBlockNumberByDate web3 (date:DateTimeOffset) =
          (date.DateTime
@@ -444,7 +436,6 @@ module Logic =
                                     volume = volume;
                               }
                          else None
-
             match candle with
             | Some candle -> callback ($"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"+
                                                  $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"+
@@ -461,11 +452,6 @@ module Logic =
             let resolutionSeconds = (int)resolutionTime.TotalSeconds
             let mutable currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
             let mutable resolutionTimeAgo = currentTime.Subtract(resolutionTime)
-            let mutable closePrice =  BigDecimal(0I, 0)
-            let mutable lowPrice = BigDecimal.Parse maxUInt256StringRepresentation
-            let mutable highPrice = BigDecimal(0I, 0)
-            let mutable openPrice = BigDecimal(0I, 0)
-            let mutable volume = 0u
             
             let mutable blockNumber = TimeZoneInfo.ConvertTimeToUtc(currentTime.DateTime)
                                       |> DateTimeOffset
@@ -474,66 +460,64 @@ module Logic =
             let mutable extremeBlockNumber = (currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3) - 1I
             
             let mutable wasRequiredTransactionsInPeriodOfTime = false
-            let mutable candle = None
-            let mutable firstIterflag = true
+            let mutable dbCandle:DBCandle option = None
+            let mutable candle = {
+                close = BigDecimal(0I, 0)
+                low = BigDecimal.Parse maxUInt256StringRepresentation
+                high = BigDecimal(0I, 0)
+                _open = BigDecimal(0I, 0)
+                volume = 0u
+            }
+            let mutable firstIterFlag = true
 
-
-
-            while true do
-
-            if blockNumber <= extremeBlockNumber
-            then extremeBlockNumber <- currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3
-                 let mutable timeForExtremeBlock = currentTime
-                 while extremeBlockNumber >= blockNumber do
-                    timeForExtremeBlock <- timeForExtremeBlock.Subtract(resolutionTime)
-                    extremeBlockNumber <- timeForExtremeBlock |> getBlockNumberByDate web3
+            while blockNumber <> 0I do
+                if blockNumber <= extremeBlockNumber
+                then extremeBlockNumber <- currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3
+                     let mutable timeForExtremeBlock = currentTime
+                     while extremeBlockNumber >= blockNumber do
+                           timeForExtremeBlock <- timeForExtremeBlock.Subtract(resolutionTime)
+                           extremeBlockNumber <- timeForExtremeBlock |> getBlockNumberByDate web3
                  
-                 candle <- if wasRequiredTransactionsInPeriodOfTime
-                           then Some {
+                     dbCandle <- if wasRequiredTransactionsInPeriodOfTime
+                                 then Some {
                                          datetime = currentTime.DateTime;
                                          resolutionSeconds = resolutionSeconds;
                                          uniswapPairId = pairId;
-                                         _open = openPrice.ToString();
-                                         high = highPrice.ToString();
-                                         low = lowPrice.ToString();
-                                         close = closePrice.ToString();
-                                         volume = volume;
-                                   }
-                            else None
-                 match candle with
-                 | Some candle -> callback ($"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"+
+                                         _open = candle._open.ToString();
+                                         high = candle.high.ToString();
+                                         low = candle.low.ToString();
+                                         close = candle.close.ToString();
+                                         volume = candle.volume;
+                                       }
+                                  else None
+                     match dbCandle with
+                     | Some candle -> callback ($"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"+
                                            $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"+
                                            $"close:{candle.close}\nvolume:{candle.volume}\n")
-                                  (DB.addCandle >> Async.RunSynchronously) candle
-                 | None -> callback $"No swaps\nfrom:{resolutionTimeAgo.DateTime}\nto:{currentTime.DateTime}"
-                 currentTime <- resolutionTimeAgo
-                 resolutionTimeAgo <- currentTime.Subtract(resolutionTime)
-                 wasRequiredTransactionsInPeriodOfTime <- false
-                 volume <- 0u
-                 highPrice <- BigDecimal(0I, 0)
-                 openPrice <- BigDecimal(0I, 0)
-                 closePrice <- BigDecimal(0I, 0)
-                 lowPrice <- BigDecimal.Parse maxUInt256StringRepresentation
-                 firstIterflag <- true
+                                      (DB.addCandle >> Async.RunSynchronously) candle
+                     | None -> callback $"No swaps\nfrom:{resolutionTimeAgo.DateTime}\nto:{currentTime.DateTime}"
+                     currentTime <- resolutionTimeAgo
+                     resolutionTimeAgo <- currentTime.Subtract(resolutionTime)
+                     wasRequiredTransactionsInPeriodOfTime <- false
+                     candle <- {
+                         volume = 0u
+                         high = BigDecimal(0I, 0)
+                         _open = BigDecimal(0I, 0)
+                         close = BigDecimal(0I, 0)
+                         low = BigDecimal.Parse maxUInt256StringRepresentation   
+                     }
+                     firstIterFlag <- true
                            
-            else let! block = Async.AwaitTask <| web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(HexBigInteger blockNumber)
-                 let transactions = block.Transactions
-                 let swapTransactions = filterSwapTransactions transactions |> Array.rev
-                 for swapTransaction in swapTransactions do
-                     let! (tokenInAddress, tokenOutAddress, 
-                           amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
-
-                     if token0Id = tokenInAddress && token1Id = tokenOutAddress
-                     then wasRequiredTransactionsInPeriodOfTime <- true
-                          let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
-                          if firstIterflag then closePrice <- currentPrice
-                                                firstIterflag <- false
-                          if (currentPrice > highPrice) then highPrice <- currentPrice
-                          if (currentPrice < lowPrice) then lowPrice <- currentPrice
-                          openPrice <- currentPrice
-                          volume <- volume + 1u
-                 blockNumber <- blockNumber - 1I     
+                else let! (_candle, _blockNumber, _wasRequiredTransactionsInPeriodOfTime, 
+                           _firstIterFlag) = buildCandleAsync blockNumber token0Id token1Id 
+                                                              candle wasRequiredTransactionsInPeriodOfTime firstIterFlag web3
+                     candle <- _candle
+                     blockNumber <- _blockNumber
+                     wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
+                     firstIterFlag <- _firstIterFlag
+                     printfn "blockNumber = %A" blockNumber
             ()
+            callback "End"
         }
        
 type TransferEvent() = 
@@ -552,50 +536,19 @@ let main args =
     let pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc"
     let resolutionTime = new TimeSpan(0, 30, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
-
-    (*let timer = new Timer(resolutionTime.TotalMilliseconds)
+    (*
+    let timer = new Timer(resolutionTime.TotalMilliseconds)
     let candlesHandler = new ElapsedEventHandler(fun obj args -> 
                                                  (pairId, (fun c -> printfn "%A" c), resolutionTime, web3)
                                                  |> Logic.getCandle |> Async.RunSynchronously |> Requests.allPr)
-    
     timer.Elapsed.AddHandler(candlesHandler)
     timer.Start()
     while true do ()*)
 
-    
-    //let account = "0x80673EA7868A1fFBC5E4c05B461fEF389f841699".ToLower()
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles |> Async.RunSynchronously |> Requests.allPr
-    (*let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x781238dfa20f5f0090a2e3d516e54d91b91a3b6f1918ef0137016b3813ea0b80")
+    
+    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x7511df45e4909a2859adaf6114162cae619da7102ba1c6592fb48731a330ef28")
                       |> Async.AwaitTask
                       |> Async.RunSynchronously
-    let paramss = (new ExactInputFunction()).DecodeTransaction(transaction).Params
-    let abiString = File.ReadAllText("..\..\..\..\Contracts\Abi\Router.abi")
-    let contract = web3.Eth.GetContract(abiString, "0xE592427A0AEce92De3Edee1F18E0157C05861564")
-    let func = contract.GetFunction("exactInput")
-    let exactInputParams = new ExactInputParams()
-    exactInputParams.Path <- paramss.Path
-    exactInputParams.AmountIn <- paramss.AmountIn
-    exactInputParams.AmountOutMinimum <- paramss.AmountOutMinimum
-    exactInputParams.Deadline <- paramss.Deadline
-    exactInputParams.Recipient <- paramss.Recipient
-    
-    let result = func.CallAsync<BigInteger>(exactInputParams) |> Async.AwaitTask |> Async.RunSynchronously*)
-    
-    (* 
-    let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
-    let abiString = File.ReadAllText("..\..\..\..\Contracts\Abi\Path.abi")
-    let binString = File.ReadAllText("..\..\..\..\Contracts\Binaries\Path.bin")*)
-    (*
-    let transactionHash = "0x164adf133ab2cda84e70614d9512b21f98e74fa1ae3069b4f30372b431ea6419"
-    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
-                      |> Async.AwaitTask
-                      |> Async.RunSynchronously
-    let receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transactionHash)
-                  |> Async.AwaitTask
-                  |> Async.RunSynchronously
-    let events = receipt.Logs.DecodeAllEvents<TransferEventDTO>()
-    let amountIn = events.[0].Event.Value
-    let amountOut = events.[1].Event.Value
-    printfn "price=%A" <| BigInteger.Divide(amountIn,amountOut)*)
 
     0

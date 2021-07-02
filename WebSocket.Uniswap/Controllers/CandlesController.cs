@@ -16,6 +16,7 @@ namespace WebSocket.Uniswap.Controllers
     [ApiController]
     public class CandlesController : ControllerBase
     {
+        //curl -X GET "https://localhost:44359/api/Candles?symbol=0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc&periodSeconds=1800&startTime=1625121600&endTime=1625125519&limit=1" -H  "accept: */*"
         [HttpGet()]
         public async Task<object> GetHistoricalCandles([FromQuery] string symbol,
             [FromQuery] int periodSeconds,
@@ -43,8 +44,8 @@ namespace WebSocket.Uniswap.Controllers
 
             var candles = await global::Program.DB.fetchCandlesTask(symbol, periodSeconds);
 
-            return candles.Where(c => c.datetime.ToUniversalTime() >= startDateTime 
-            && c.datetime.ToUniversalTime() <= endDateTime)
+            return candles.Where(c => c.datetime >= startDateTime 
+            && c.datetime <= endDateTime)
                 .OrderByDescending(c => c.datetime)
                 .Take(limit.Value);
         }

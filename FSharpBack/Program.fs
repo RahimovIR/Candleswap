@@ -25,6 +25,7 @@ open Nethereum.Util
 open System.IO
 open Contracts.MystToken.ContractDefinition
 open Nethereum.ABI
+open System.Threading.Tasks
 
 
 
@@ -338,9 +339,14 @@ module Logic =
                 return getSimpleInfoFromRouter transaction events
         }
         
+    let getBlockByDateTimeOffsetAsync web3 (date:DateTimeOffset) =
+         date.DateTime
+         |> Dater.convertToUnixTimestamp
+         |> BigInteger
+         |> Dater.getBlockByDateAsync true web3//IfBlockAfterDate
    
-    let buildCandleAsync (blockNumber:BigInteger) token0Id token1Id (candle:Candle) wasRequiredTransactionsInPeriodOfTime
-                         firstIterFlag (web3:Web3) =
+    let partlyBuildCandleAsync (block:BlockWithTransactions) token0Id token1Id (candle:Candle)
+                               wasRequiredTransactionsInPeriodOfTime firstIterFlag (web3:Web3) =
         async{
             let mutable closePrice =  candle.close
             let mutable lowPrice = candle.low
@@ -350,8 +356,6 @@ module Logic =
             let mutable _wasRequiredTransactionsInPeriodOfTime = wasRequiredTransactionsInPeriodOfTime
             let mutable _firstIterFlag = firstIterFlag
 
-            let! block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(HexBigInteger blockNumber)
-                         |> Async.AwaitTask
             let transactions = block.Transactions
             let swapTransactions = filterSwapTransactions transactions |> Array.rev
             for swapTransaction in swapTransactions do
@@ -373,70 +377,89 @@ module Logic =
                 high = highPrice;
                 _open = openPrice;
                 volume = volume;
-            }, blockNumber - 1I, _wasRequiredTransactionsInPeriodOfTime, _firstIterFlag)
+            }, _wasRequiredTransactionsInPeriodOfTime, _firstIterFlag)
         }
 
-    let getBlockNumberByDate web3 (date:DateTimeOffset) =
-         (date.DateTime
-         |> Dater.convertToUnixTimestamp
-         |> BigInteger
-         |> Dater.getBlockByDateAsync true web3//IfBlockAfterDate
-         |> Async.RunSynchronously).number.Value
-
-    let getCandle(pairId: string, callback, resolutionTime:TimeSpan, web3:Web3) =
-        async { 
+    let buildCandleAsync currentTime (resolutionTime:TimeSpan) resolutionTimeAgo pairId (web3:Web3) = 
+        async{
             let pair = Requests.takePairInfo(pairId).Value
             let token0Id = pair.token0Id
             let token1Id = pair.token1Id
-            let resolutionSeconds = (int)resolutionTime.TotalSeconds
-            let currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
-            let resolutionTimeAgo = currentTime.Subtract(resolutionTime)
-            let mutable blockNumber = TimeZoneInfo.ConvertTimeToUtc(currentTime.DateTime)
-                                      |> DateTimeOffset
-                                      |> getBlockNumberByDate web3
-            let extremeBlockNumber = (currentTime.Subtract(resolutionTime) |> getBlockNumberByDate web3) - 1I
-
-            let mutable candle = {
-                close = BigDecimal(0I, 0)
-                low = BigDecimal.Parse maxUInt256StringRepresentation
-                high = BigDecimal(0I, 0)
-                _open = BigDecimal(0I, 0)
-                volume = 0u
-            }
-
+            let mutable blockNumber = (getBlockByDateTimeOffsetAsync web3 currentTime
+                                      |> Async.RunSynchronously).number.Value
+            let mutable block = HexBigInteger blockNumber
+                                |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                                |> Async.AwaitTask
+                                |> Async.RunSynchronously
+            let mutable candle = { close = BigDecimal(0I, 0);
+                                   low = BigDecimal.Parse maxUInt256StringRepresentation;
+                                   high = BigDecimal(0I, 0);
+                                   _open = BigDecimal(0I, 0);
+                                   volume = 0u;
+                                 }
             let mutable wasRequiredTransactionsInPeriodOfTime = false
-
             let mutable firstIterFlag = true
-            while blockNumber > extremeBlockNumber do
-                  let! (_candle, _blockNumber, _wasRequiredTransactionsInPeriodOfTime, 
-                        _firstIterFlag) = buildCandleAsync blockNumber token0Id token1Id 
-                                                           candle wasRequiredTransactionsInPeriodOfTime firstIterFlag web3
-                  candle <- _candle
-                  blockNumber <- _blockNumber
-                  wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
-                  firstIterFlag <- _firstIterFlag
-                  printfn "blockNumber = %A" blockNumber
-            
+
+            while block.Timestamp.Value > resolutionTimeAgo  do
+                let! (_candle, _wasRequiredTransactionsInPeriodOfTime, 
+                      _firstIterFlag) = partlyBuildCandleAsync block token0Id token1Id candle
+                                                               wasRequiredTransactionsInPeriodOfTime firstIterFlag web3
+                candle <- _candle
+                wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
+                firstIterFlag <- _firstIterFlag
+                blockNumber <- blockNumber - 1I
+                block <- HexBigInteger blockNumber
+                         |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                         |> Async.AwaitTask
+                         |> Async.RunSynchronously
+                printfn "blockNumber = %A" blockNumber
             let dbCandle = if wasRequiredTransactionsInPeriodOfTime
                            then Some {
-                                    datetime = currentTime.DateTime;
-                                    resolutionSeconds = resolutionSeconds;
-                                    uniswapPairId = pairId;
-                                    _open = candle._open.ToString();
-                                    high = candle.high.ToString();
-                                    low = candle.low.ToString();
-                                    close = candle.close.ToString();
-                                    volume = candle.volume;
-                              }
-                           else None
-            match dbCandle with
-            | Some candle -> callback ($"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"+
-                                                 $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"+
-                                                 $"close:{candle.close}\nvolume:{candle.volume}")
-                             (DB.addCandle >> Async.RunSynchronously) candle
-            | None -> callback $"No swaps\nfrom:{resolutionTimeAgo.DateTime}\nto:{currentTime.DateTime}"
+                               datetime = currentTime.DateTime;
+                               resolutionSeconds = (int)resolutionTime.TotalSeconds;
+                               uniswapPairId = pairId;
+                               _open = candle._open.ToString();
+                               high = candle.high.ToString();
+                               low = candle.low.ToString();
+                               close = candle.close.ToString();
+                               volume = candle.volume;
+                           }
+                            else None
+            return dbCandle
         }
 
+    let sendCallbackAndWriteToDB candle (currentTime:DateTimeOffset) (resolutionTimeAgo:DateTimeOffset) callback = 
+        match candle with
+        | Some candle -> callback ($"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"+
+                                             $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"+
+                                             $"close:{candle.close}\nvolume:{candle.volume}")
+                         (DB.addCandle >> Async.RunSynchronously) candle
+        | None -> callback $"No swaps\nfrom:{resolutionTimeAgo.DateTime}\nto:{currentTime.DateTime}"
+
+    let buildCandleSendCallbackAndWriteToDBAsync (resolutionTime:TimeSpan) pairId callback (web3:Web3) = 
+        async{
+            let mutable currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
+            let resolutionTimeAgo = currentTime.Subtract(resolutionTime)
+            let resolutionTimeAgoUnix = resolutionTimeAgo.ToUnixTimeSeconds() |> BigInteger
+            let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
+            sendCallbackAndWriteToDB dbCandle currentTime resolutionTimeAgo callback
+        }
+        
+
+    let getCandle(pairId: string, callback, resolutionTime:TimeSpan, web3:Web3) =
+        let timer = new Timer(resolutionTime.TotalMilliseconds)
+        timer.Start()
+
+        let candlesHandler = new ElapsedEventHandler(fun _ _ -> 
+                                                     buildCandleSendCallbackAndWriteToDBAsync resolutionTime 
+                                                                                                  pairId callback web3
+                                                     |> Async.RunSynchronously
+                                                     )
+        timer.Elapsed.RemoveHandler(new ElapsedEventHandler(fun _ _ -> ()))
+        timer.Elapsed.AddHandler(candlesHandler)
+        while true do
+        ()
+        (*
     let getCandles (pairId, callback, (resolutionTime:TimeSpan), web3:Web3) =
         async{
             let pair = Requests.takePairInfo(pairId).Value
@@ -511,7 +534,7 @@ module Logic =
                      printfn "blockNumber = %A" blockNumber
             ()
             callback "End"
-        }
+        }*)
        
 type TransferEvent() = 
     interface IEventDTO
@@ -529,19 +552,18 @@ let main args =
     let pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc"
     let resolutionTime = new TimeSpan(0, 0, 10)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
-    
+    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle 
+    Task.Delay(TimeSpan.FromHours(1.0)) |> ignore
+    (*
     let timer = new Timer(resolutionTime.TotalMilliseconds)
     let candlesHandler = new ElapsedEventHandler(fun obj args -> 
                                                  (pairId, (fun c -> printfn "%A" c), resolutionTime, web3)
                                                  |> Logic.getCandle |> Async.RunSynchronously |> Requests.allPr)
     timer.Elapsed.AddHandler(candlesHandler)
     timer.Start()
-    while true do ()
+    while true do ()*)
 
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles |> Async.RunSynchronously |> Requests.allPr
-    
-    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync("0x7511df45e4909a2859adaf6114162cae619da7102ba1c6592fb48731a330ef28")
-                      |> Async.AwaitTask
-                      |> Async.RunSynchronously
+    //let filter  = web3.Eth.Filters.GetFilterChangesForBlockOrTransaction.
 
     0

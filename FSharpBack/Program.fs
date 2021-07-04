@@ -58,19 +58,33 @@ module Requests =
                    }}
                }}
               }}"""
+
+    let poolInfoQuery id = 
+        $"""query q {{
+            pool(id: "{id}"){{
+                token0{{
+                    id
+                }}
+                token1{{
+                    id
+                }}
+            }}
+           }}"""
+
     
-    let requestMaker query =
+    let requestMaker serverUrl query =
         use connection = new GraphQLClientConnection()
         let request : GraphQLRequest =
             { Query = query
               Variables = [||]
-              ServerUrl = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2"
+              ServerUrl = serverUrl
               HttpHeaders = [| |]
               OperationName = Some "q" }
         GraphQLClient.sendRequest connection request
     
     type Swap = { id: string; amount0In: float; amount0Out: float; amount1In:float; amount1Out: float; timestamp: int64 } 
     type PairInfo = { reserve0: BigInteger; reserve1: BigInteger; price0: float; price1: float; token0Id: string; token1Id:string }
+    type PoolInfo = {token0Id: string; token1Id: string;}
       
     let mapSwaps (token: JToken Option) =
         let mapper (token : JProperty) =
@@ -93,6 +107,17 @@ module Requests =
         match token with
         |Some token -> token.Children<JProperty>() |> Seq.last |> mapper |> Some
         |None -> None
+
+    let mapPoolInfo (token: JToken Option) =
+        let mapper (token: JProperty) = 
+            let info = token.Value.["pool"]
+            {
+                token0Id = info.["token0"].["id"].ToString();
+                token1Id = info.["token1"].["id"].ToString();
+            }
+        match token with
+        | Some token -> token.Children<JProperty>() |> Seq.last |> mapper |> Some
+        | None -> None
         
     let deserialize (data : string) =
         if String.IsNullOrWhiteSpace(data)
@@ -101,8 +126,12 @@ module Requests =
     
     let allPr x = printfn "%A" x
 
-    let takeSwaps idPair = idPair |> swapsQuery |> requestMaker |> deserialize |> mapSwaps
-    let takePairInfo idPair = idPair |> pairInfoQuery |> requestMaker |> deserialize |> mapPairInfo
+    let uniswapV2 = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2"
+    let uniswapV3 = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3"
+
+    let takeSwaps idPair = idPair |> swapsQuery |> requestMaker uniswapV2 |> deserialize |> mapSwaps
+    let takePairInfo idPair = idPair |> pairInfoQuery |> requestMaker uniswapV2 |> deserialize |> mapPairInfo
+    let takePoolInfo idPair = idPair |> poolInfoQuery |> requestMaker uniswapV3 |> deserialize |> mapPoolInfo
 
 type Candle = { 
     _open:BigDecimal;
@@ -363,7 +392,7 @@ module Logic =
                       amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
                 if token0Id = tokenInAddress && token1Id = tokenOutAddress
                 then _wasRequiredTransactionsInPeriodOfTime <- true
-                     printfn "%s" swapTransaction.TransactionHash
+                     printfn "\n\n\nTRANSACTION!!!\n\n%s" swapTransaction.TransactionHash
                      let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
                      if _firstIterFlag then closePrice <- currentPrice
                                             _firstIterFlag <- false
@@ -382,9 +411,12 @@ module Logic =
 
     let buildCandleAsync currentTime (resolutionTime:TimeSpan) resolutionTimeAgo pairId (web3:Web3) = 
         async{
-            let pair = Requests.takePairInfo(pairId).Value
+            //let pair = Requests.takePairInfo(pairId).Value
+            let pair = Requests.takePoolInfo(pairId).Value
             let token0Id = pair.token0Id
             let token1Id = pair.token1Id
+            //let token0Id = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            //let token1Id = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
             let mutable blockNumber = (getBlockByDateTimeOffsetAsync web3 currentTime
                                       |> Async.RunSynchronously).number.Value
             let mutable block = HexBigInteger blockNumber
@@ -439,6 +471,7 @@ module Logic =
     let buildCandleSendCallbackAndWriteToDBAsync (resolutionTime:TimeSpan) pairId callback (web3:Web3) = 
         async{
             let mutable currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
+            //let mutable currentTime = new DateTimeOffset(new DateTime(2021, 7, 4, 9, 4, 50))
             let resolutionTimeAgo = currentTime.Subtract(resolutionTime)
             let resolutionTimeAgoUnix = resolutionTimeAgo.ToUnixTimeSeconds() |> BigInteger
             let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
@@ -549,10 +582,11 @@ type TransferEvent() =
 
 [<EntryPoint>]
 let main args =
-    let pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc"
+    let pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520"
     let resolutionTime = new TimeSpan(0, 0, 10)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
-    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle 
+    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
+    //let pool = Requests.takePoolInfo pairId
     Task.Delay(TimeSpan.FromHours(1.0)) |> ignore
     (*
     let timer = new Timer(resolutionTime.TotalMilliseconds)

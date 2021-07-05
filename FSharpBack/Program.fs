@@ -322,16 +322,35 @@ module Logic =
     let decodeInputSingle input = 
         (new ExactInputSingleFunction()).DecodeInput(input)
 
-    (*let decodeOutputSingle input = 
-        (new ExactOutputSingleFunction()).DecodeInput(input)*)
+    (*let decodeMulticallFunctions functions counter =
+        try
+            (new ExactInputFunction()).DecodeInput(functions.[counter].ToHex())
+        with
+        | _ -> decodeMulticallFunctions*)
 
     let decodeInput input =
+        //try
+        (*try
+            let functions = (new MulticallFunction()).DecodeInput(input)
+            (new ExactInputFunction()).DecodeInput(functions.Data.[0].ToString())
+        with
+        | ex -> (new ExactInputFunction()).DecodeInput(input)*)
+        //with ex -> new ExactInputFunction()
+        
         try
-            (new ExactInputFunction()).DecodeInput(input)
-        with ex -> new ExactInputFunction()
-
-    (*let decodeOutput input = 
-        (new ExactOutputFunction()).DecodeInput(input)*)
+            let functions = (new MulticallFunction()).DecodeInput(input).Data
+            let mutable decodedInput = new ExactInputFunction()
+            let mutable successfulDecoded = false
+            for func in functions do
+                try
+                    decodedInput <- (new ExactInputFunction()).DecodeInput(func.ToHex())
+                    successfulDecoded <- true
+                with
+                | _ -> ()
+            if successfulDecoded then decodedInput
+            else new ExactInputFunction()
+        with
+        | _ -> (new ExactInputFunction()).DecodeInput(input)
 
     let decodeFirstPool path = 
         (new DecodeFirstPoolFunction()).DecodeTransaction(path)
@@ -350,11 +369,12 @@ module Logic =
         (tokenIn, tokenOut, amountIn, amountOut)
 
     
-    let getSimpleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) = 
+    let getSimpleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) =
+        //printfn "%s" transaction.TransactionHash
         let decodedInput = decodeInput transaction.Input
-        let tokenIn = "0x" //+ decodedInput.Params.Path.Slice(0, 20).ToHex()
+        let tokenIn = "0x" + decodedInput.Params.Path.Slice(0, 20).ToHex()
         //let second = decoded.Params.Path.Slice(23, 43).ToHex()
-        let tokenOut = "0x" //+ decodedInput.Params.Path.Slice(46, 66).ToHex()
+        let tokenOut = "0x" + decodedInput.Params.Path.Slice(46, 66).ToHex()
         (*if events.Count = 4
         then let amountIn = events.[1].Event.Value
              let amountOut = events.[2].Event.Value
@@ -374,20 +394,8 @@ module Logic =
                 elif events.Count = 4 then return getSimpleInfoFromRouter transaction events
                 else return ("", "", 0I, 0I)
             with
-            | ex -> return ("", "", 0I, 0I)
-            (*try
-                return getSingleInfoFromRouter transaction events
-            with
-            | :? System.NullReferenceException as ex when ex.TargetSite.Name = "getSingleInfoFromRouter" ->
-                return getSimpleInfoFromRouter transaction events*)
+            | _ -> return ("", "", 0I, 0I)
         }
-        
-    (*let getBlockByDateTimeOffsetAsync web3 (date:DateTimeOffset) =
-         //date.DateTime
-         //|> Dater.convertToUnixTimestamp
-         date.ToUnixTimeSeconds()
-         |> BigInteger
-         |> Dater.getBlockByDateAsync false web3//IfBlockAfterDate*)
    
     let partlyBuildCandleAsync (block:BlockWithTransactions) token0Id token1Id (candle:Candle)
                                wasRequiredTransactionsInPeriodOfTime firstIterFlag (web3:Web3) =
@@ -407,7 +415,7 @@ module Logic =
                       amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
                 if token0Id = tokenInAddress && token1Id = tokenOutAddress
                 then _wasRequiredTransactionsInPeriodOfTime <- true
-                     printfn "\n\n\nTRANSACTION!!!\n\n%s" swapTransaction.TransactionHash
+                     printfn "\n\n\nTRANSACTION!!!\n%s\n\n" swapTransaction.TransactionHash
                      let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
                      if _firstIterFlag then closePrice <- currentPrice
                                             _firstIterFlag <- false
@@ -427,11 +435,11 @@ module Logic =
     let buildCandleAsync (currentTime:DateTimeOffset) (resolutionTime:TimeSpan) resolutionTimeAgoUnix pairId (web3:Web3) = 
         async{
             //let pair = Requests.takePairInfo(pairId).Value
-            //let pair = Requests.takePoolInfo(pairId).Value
-            //let token0Id = pair.token0Id
-            //let token1Id = pair.token1Id
-            let token0Id = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
-            let token1Id = "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            let pair = Requests.takePoolInfo(pairId).Value
+            let token0Id = pair.token0Id
+            let token1Id = pair.token1Id
+            //let token0Id = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+            //let token1Id = "0xdac17f958d2ee523a2206206994597c13d831ec7"
             let mutable blockNumber = (currentTime.ToUnixTimeSeconds()
                                        |> BigInteger
                                        |> Dater.getBlockByDateAsync false web3//IfBlockAfterDate
@@ -456,7 +464,7 @@ module Logic =
                 candle <- _candle
                 wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag <- _firstIterFlag
-                printfn "blockNumber = %A" blockNumber
+                //printfn "blockNumber = %A" blockNumber
                 blockNumber <- blockNumber - 1I
                 block <- HexBigInteger blockNumber
                          |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
@@ -489,7 +497,7 @@ module Logic =
         async{
             //let mutable currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
             //let mutable currentTime = new DateTimeOffset(new DateTime(2021, 7, 4, 9, 4, 50))
-            printfn "time=%A" <| currentTime.ToUnixTimeSeconds()
+            //printfn "time=%A" <| currentTime.ToUnixTimeSeconds()
             let resolutionTimeAgo = currentTime.Subtract(resolutionTime)
             let resolutionTimeAgoUnix = resolutionTimeAgo.ToUnixTimeSeconds() |> BigInteger
             let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
@@ -503,8 +511,8 @@ module Logic =
         let mutable testCurrentTime = DateTime(2021, 7, 4, 14, 13, 17).ToUniversalTime()
 
         let candlesHandler = new ElapsedEventHandler(fun _ _ ->
-                                                     //DateTime.Now.ToUniversalTime()
-                                                     testCurrentTime
+                                                     DateTime.Now.ToUniversalTime()
+                                                     //testCurrentTime
                                                      |> DateTimeOffset
                                                      |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime 
                                                                                                  pairId callback web3
@@ -540,23 +548,19 @@ type TransferEvent() =
 
 [<EntryPoint>]
 let main args =
-    let pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520"
-    let resolutionTime = new TimeSpan(0, 0, 10)
+    let pairId = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
+    let resolutionTime = new TimeSpan(0, 5, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
-    //let pool = Requests.takePoolInfo pairId
-    //Task.Delay(TimeSpan.FromHours(1.0))
-    (*
-    let timer = new Timer(resolutionTime.TotalMilliseconds)
-    let candlesHandler = new ElapsedEventHandler(fun obj args -> 
-                                                 (pairId, (fun c -> printfn "%A" c), resolutionTime, web3)
-                                                 |> Logic.getCandle |> Async.RunSynchronously |> Requests.allPr)
-    timer.Elapsed.AddHandler(candlesHandler)
-    timer.Start()
-    while true do ()*)
 
-    //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles |> Async.RunSynchronously |> Requests.allPr
-    //let filter  = web3.Eth.Filters.GetFilterChangesForBlockOrTransaction.
+    (*let multicallTransactionHash = "0x96ec819ea4e061fac2fa09d6bd585dccce229df3b9038892ce69f54ff2933e0a"
+    let secondMulticallTransactionHash = "0xfbf43999daf3371cf1cb49bdb9cde1108642596bdb80ff2fb3d9135e789d09b0"
+    let transactionHash = "0x02157c5a170a204c1c111956be7ea077c73c8d64c2fd17748c12b36c51093c6e"
+    
+    let transaction  = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
+                       |> Async.AwaitTask
+                       |> Async.RunSynchronously
 
+    let decoded = Logic.decodeInput transaction.Input*)
     0

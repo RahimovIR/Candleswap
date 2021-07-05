@@ -26,6 +26,7 @@ open System.IO
 open Contracts.MystToken.ContractDefinition
 open Nethereum.ABI
 open System.Threading.Tasks
+open System.Linq
 
 
 
@@ -322,70 +323,55 @@ module Logic =
     let decodeInputSingle input = 
         (new ExactInputSingleFunction()).DecodeInput(input)
 
-    (*let decodeMulticallFunctions functions counter =
-        try
-            (new ExactInputFunction()).DecodeInput(functions.[counter].ToHex())
-        with
-        | _ -> decodeMulticallFunctions*)
-
-    let decodeInput input =
-        //try
-        (*try
-            let functions = (new MulticallFunction()).DecodeInput(input)
-            (new ExactInputFunction()).DecodeInput(functions.Data.[0].ToString())
-        with
-        | ex -> (new ExactInputFunction()).DecodeInput(input)*)
-        //with ex -> new ExactInputFunction()
-        
+    let decodeInput input =     
         try
             let functions = (new MulticallFunction()).DecodeInput(input).Data
             let mutable decodedInput = new ExactInputFunction()
-            let mutable successfulDecoded = false
+            let mutable successfullyDecoded = false
             for func in functions do
                 try
                     decodedInput <- (new ExactInputFunction()).DecodeInput(func.ToHex())
-                    successfulDecoded <- true
+                    successfullyDecoded <- true
                 with
                 | _ -> ()
-            if successfulDecoded then decodedInput
+            if successfullyDecoded then decodedInput
             else new ExactInputFunction()
         with
-        | _ -> (new ExactInputFunction()).DecodeInput(input)
+        | _ -> try
+                   (new ExactInputFunction()).DecodeInput(input)//ExactInputSingleFunction!!!
+               with
+               | _ -> new ExactInputFunction()
 
     let decodeFirstPool path = 
         (new DecodeFirstPoolFunction()).DecodeTransaction(path)
 
     let getSingleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) =
-        let decodedInput = decodeInputSingle transaction.Input
-        let tokenIn = decodedInput.Params.TokenIn
-        let tokenOut = decodedInput.Params.TokenOut
-        (*if events.Count = 2
-        then let amountIn = events.[1].Event.Value
-             let amountOut = events.[0].Event.Value
-             (tokenIn, tokenOut, amountIn, amountOut)
-        else ("", "", 0I, 0I)//tokenIn,Out=null*)
-        let amountIn = events.[1].Event.Value
-        let amountOut = events.[0].Event.Value
-        (tokenIn, tokenOut, amountIn, amountOut)
+        try
+            let decodedInput = decodeInputSingle transaction.Input
+            let tokenIn = decodedInput.Params.TokenIn
+            let tokenOut = decodedInput.Params.TokenOut
+            let amountIn = events.[1].Event.Value
+            let amountOut = events.[0].Event.Value
+            (tokenIn, tokenOut, amountIn, amountOut)
+        with
+        | _ -> ("", "", 0I, 0I)
 
     
     let getSimpleInfoFromRouter (transaction:Transaction) (events:List<EventLog<TransferEventDTO>>) =
-        //printfn "%s" transaction.TransactionHash
-        let decodedInput = decodeInput transaction.Input
-        let tokenIn = "0x" + decodedInput.Params.Path.Slice(0, 20).ToHex()
-        //let second = decoded.Params.Path.Slice(23, 43).ToHex()
-        let tokenOut = "0x" + decodedInput.Params.Path.Slice(46, 66).ToHex()
-        (*if events.Count = 4
-        then let amountIn = events.[1].Event.Value
-             let amountOut = events.[2].Event.Value
-             (tokenIn, tokenOut, amountIn, amountOut)
-        else ("", "", 0I, 0I)*)
-        let amountIn = events.[1].Event.Value
-        let amountOut = events.[2].Event.Value
-        (tokenIn, tokenOut, amountIn, amountOut)
+        try
+            let decodedInput = decodeInput transaction.Input
+            let tokenIn = "0x" + decodedInput.Params.Path.Slice(0, 20).ToHex()
+            //let second = decoded.Params.Path.Slice(23, 43).ToHex()
+            let tokenOut = "0x" + decodedInput.Params.Path.Slice(46, 66).ToHex()
+            let amountIn = events.[1].Event.Value
+            let amountOut = events.[2].Event.Value
+            (tokenIn, tokenOut, amountIn, amountOut)
+        with
+        | _ -> ("", "", 0I, 0I)
     
     let getInfoFromRouterAsync (transaction:Transaction) (web3:Web3) =
         async{
+            printfn "%s" transaction.TransactionHash
             let! receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
                            |> Async.AwaitTask
             try
@@ -434,7 +420,6 @@ module Logic =
 
     let buildCandleAsync (currentTime:DateTimeOffset) (resolutionTime:TimeSpan) resolutionTimeAgoUnix pairId (web3:Web3) = 
         async{
-            //let pair = Requests.takePairInfo(pairId).Value
             let pair = Requests.takePoolInfo(pairId).Value
             let token0Id = pair.token0Id
             let token1Id = pair.token1Id
@@ -495,9 +480,6 @@ module Logic =
 
     let buildCandleSendCallbackAndWriteToDBAsync (resolutionTime:TimeSpan) pairId callback (web3:Web3) (currentTime:DateTimeOffset) = 
         async{
-            //let mutable currentTime = new DateTimeOffset(DateTime.Now.ToUniversalTime())
-            //let mutable currentTime = new DateTimeOffset(new DateTime(2021, 7, 4, 9, 4, 50))
-            //printfn "time=%A" <| currentTime.ToUnixTimeSeconds()
             let resolutionTimeAgo = currentTime.Subtract(resolutionTime)
             let resolutionTimeAgoUnix = resolutionTimeAgo.ToUnixTimeSeconds() |> BigInteger
             let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
@@ -508,7 +490,7 @@ module Logic =
     let getCandle(pairId: string, callback, resolutionTime:TimeSpan, web3:Web3) =
         let timer = new Timer(resolutionTime.TotalMilliseconds)
 
-        let mutable testCurrentTime = DateTime(2021, 7, 4, 14, 13, 17).ToUniversalTime()
+        //let mutable testCurrentTime = DateTime(2021, 7, 4, 14, 13, 17).ToUniversalTime()
 
         let candlesHandler = new ElapsedEventHandler(fun _ _ ->
                                                      DateTime.Now.ToUniversalTime()
@@ -517,7 +499,7 @@ module Logic =
                                                      |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime 
                                                                                                  pairId callback web3
                                                      |> Async.RunSynchronously
-                                                     testCurrentTime <- testCurrentTime.Add(resolutionTime)
+                                                     //testCurrentTime <- testCurrentTime.Add(resolutionTime)
                                                      )
         timer.Elapsed.AddHandler(candlesHandler)
         timer.Start()
@@ -549,18 +531,20 @@ type TransferEvent() =
 [<EntryPoint>]
 let main args =
     let pairId = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
-    let resolutionTime = new TimeSpan(0, 5, 0)
+    let resolutionTime = new TimeSpan(0, 60, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
 
-    (*let multicallTransactionHash = "0x96ec819ea4e061fac2fa09d6bd585dccce229df3b9038892ce69f54ff2933e0a"
-    let secondMulticallTransactionHash = "0xfbf43999daf3371cf1cb49bdb9cde1108642596bdb80ff2fb3d9135e789d09b0"
-    let transactionHash = "0x02157c5a170a204c1c111956be7ea077c73c8d64c2fd17748c12b36c51093c6e"
+    (*let transactionHash = "0x36c939bdac02b6ef98df06b24c482219a92d8512774c506d9e361d0f1b1e5a58"
     
     let transaction  = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
                        |> Async.AwaitTask
                        |> Async.RunSynchronously
 
-    let decoded = Logic.decodeInput transaction.Input*)
+    let result = (new ABIEncode()).GetABIEncoded("exactInput").ToHex()
+    (new Nethereum.ABI.FunctionEncoding.FunctionCallEncoder()).EncodeRequest((ExactInputParams))
+
+    let ifContains = transaction.Input.Contains(result)*)
+
     0

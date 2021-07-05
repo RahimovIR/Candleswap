@@ -11,27 +11,36 @@ namespace WebSocket.Uniswap.Infrastructure
 {
     public static class CandleEvent
     {
+        private static SortedDictionary<(string, int), CancellationTokenSource> EventsInvoked = new();
 
-        public static SortedSet<(string, int)> EventsInvoked = new SortedSet<(string, int)>();
-
-        public static Task GetCandles(string uniswapId, Action<string> onCandle, int resolutionSeconds)
+        public static void SubscribeCandles(string uniswapId, Action<string> onCandle, int resolutionSeconds)
         {
             if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out _))
             {
-                //return Task.CompletedTask;
+                return;
             }
             else
             {
-                EventsInvoked.Add((uniswapId, resolutionSeconds));
+                EventsInvoked.Add((uniswapId, resolutionSeconds), new CancellationTokenSource());
             }
-            uniswapId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc";
-            var fsharpFunc = FuncConvert.ToFSharpFunc<string>(t => onCandle(t));
+            EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out var cancelToken);
+            var fsharpFunc = FuncConvert.ToFSharpFunc<string>(c =>
+            {
+                onCandle(c);
+            });
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
-            return FSharpAsync.StartAsTask(
-                global::Program.Logic.getCandle(
-                    uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds), web3),
-                new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
-                new FSharpOption<CancellationToken>(new CancellationToken()));
+
+            global::Program.Logic.getCandle(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                                            web3);
+
+        }
+
+        public static void UnsubscribeCandles(string uniswapId, int resolutionSeconds)
+        {
+            if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out var cancelToken))
+            {
+                cancelToken.Cancel();
+            }
         }
     }
 }

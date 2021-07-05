@@ -18,21 +18,24 @@ namespace Test.Uniswap
         [TestMethod]
         public async Task GetCandles()
         {
-            var pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc";
-            var resolutionTime = TimeSpan.FromSeconds(5);
-            var timer = new System.Timers.Timer(resolutionTime.TotalSeconds * 1000);
-
-            timer.Elapsed += async (_, _) =>
+            static void LogResponse(string c)
             {
-                await CandleEvent.GetCandles(
-                    pairId,
-                    (c) => Console.WriteLine(c),
-                    (int)resolutionTime.TotalSeconds);
-                Console.WriteLine("Elapsed!" + DateTime.UtcNow);
-            };
-            timer.Start();
+                Console.WriteLine(c); 
+                Debug.WriteLine(c); 
+            }
+            var pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc";
+            var resolutionTime = TimeSpan.FromSeconds(10);
 
-            await Task.Delay(TimeSpan.FromSeconds(60));
+            CandleEvent.SubscribeCandles(
+                     pairId,
+                     c => {
+                         Console.WriteLine(c);
+                         Debug.WriteLine(c);
+                     },
+                     (int)resolutionTime.TotalSeconds);
+
+            await Task.Delay(TimeSpan.FromSeconds(20));
+            CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
         }
 
 

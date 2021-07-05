@@ -35,7 +35,7 @@ namespace WebSocket.Uniswap.Middlewares
 
                     WebSocketConnection webSocketConnection = new WebSocketConnection(webSocket, _options.ReceivePayloadBufferSize);
                     webSocketConnection.ReceiveText += async (sender, message) => { await webSocketConnection.SendAsync(message, CancellationToken.None); };
-
+                    webSocketConnection.ReceiveCandleUpdate += async (sender, candle) => { await webSocketConnection.SendAsync(candle, CancellationToken.None); };
                     _connectionsService.AddConnection(webSocketConnection);
 
                     await webSocketConnection.ReceiveMessagesUntilCloseAsync();

@@ -30,6 +30,8 @@ namespace WebSocket.Uniswap.Infrastructure
 
         public event EventHandler<byte[]> ReceiveBinary;
 
+        public event EventHandler<string> ReceiveCandleUpdate;
+
         #endregion
 
         #region Constructor
@@ -79,13 +81,13 @@ namespace WebSocket.Uniswap.Infrastructure
                     }
                     else
                     {
-                        var webSocketMessage = Encoding.UTF8.GetString(receivePayloadBuffer).TrimEnd('\0').ToUpper();
+                        var webSocketMessage = Encoding.UTF8.GetString(receivePayloadBuffer).TrimEnd('\0');
                         if (webSocketMessage == "PING")
                         {
                             OnReceivePingPong(webSocketMessage);
                         }
-                        else if (webSocketMessage.Contains("CANDLES"))
-                            OnReceiveCandles(webSocketMessage);
+                        else if (webSocketMessage.Contains("candles"))
+                            await OnReceiveCandles(webSocketMessage);
                         else
                             OnReceiveText(webSocketMessage);
                     }
@@ -97,7 +99,9 @@ namespace WebSocket.Uniswap.Infrastructure
                 CloseStatusDescription = webSocketReceiveResult.CloseStatusDescription;
             }
             catch (WebSocketException wsex) when (wsex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
-            { }
+            {
+
+            }
         }
 
         private void OnReceiveText(string webSocketMessage)
@@ -110,19 +114,28 @@ namespace WebSocket.Uniswap.Infrastructure
             ReceiveBinary?.Invoke(this, webSocketMessage);
         }
 
-        private void OnReceivePingPong(string webSocketMessage)
+        private void OnReceivePingPong(string _)
         {
-            webSocketMessage = "PONG";
+            var webSocketMessage = "PONG";
             ReceiveText?.Invoke(this, webSocketMessage);
         }
 
-        private void OnReceiveCandles(string webSocketMessage)
+        private void OnCandleUpdateReceived(string candle)
+        {
+            ReceiveCandleUpdate?.Invoke(this, candle);
+        }
+
+        private async Task OnReceiveCandles(string webSocketMessage)
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = arrayKeyParam[1] == "1m" ? 60 : 60;
+            int resolution = arrayKeyParam[1] switch 
+            {
+                "1m" => 60,
+                _ => 10
+            };
 
-            CandleEvent.GetCandles(arrayKeyParam[2], c => Console.WriteLine(c), resolution);
+            CandleEvent.SubscribeCandles(arrayKeyParam[2], OnCandleUpdateReceived, resolution);
 
             ReceiveText?.Invoke(this, webSocketMessage);
         }

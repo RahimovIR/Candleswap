@@ -1,7 +1,9 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -16,26 +18,68 @@ namespace Test.Uniswap
         private const string webSocketURL = "wss://localhost:5001/socket";
 
         [TestMethod]
-        public async Task GetCandles()
+        public async Task GetCandles_PassWhenAny()
         {
-            static void LogResponse(string c)
-            {
-                Console.WriteLine(c); 
-                Debug.WriteLine(c); 
-            }
-            var pairId = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc";
-            var resolutionTime = TimeSpan.FromSeconds(10);
+            var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
+            var resolutionTime = TimeSpan.FromSeconds(5);
 
+            var responseList = new List<string>();
             CandleEvent.SubscribeCandles(
                      pairId,
-                     c => {
-                         Console.WriteLine(c);
-                         Debug.WriteLine(c);
+                     c =>
+                     {
+                         responseList.Add(c);
                      },
                      (int)resolutionTime.TotalSeconds);
 
-            await Task.Delay(TimeSpan.FromSeconds(20));
+            await Task.Delay(TimeSpan.FromSeconds(30));
             CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            Assert.IsTrue(responseList.Any());
+        }
+
+        [TestMethod]
+        public async Task GetCandles_PassWhenCandleReceived()
+        {
+            var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
+            var resolutionTime = TimeSpan.FromMinutes(5);
+
+            var candlesList = new List<string>();
+            CandleEvent.SubscribeCandles(
+                     pairId,
+                     c =>
+                     {
+                         if (c.Contains("_open"))
+                         {
+                             candlesList.Add(c);
+                         }
+                     },
+                     (int)resolutionTime.TotalSeconds);
+
+            TimeSpan delay = TimeSpan.FromMinutes(6);
+            await Task.Delay(delay);
+            CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            Assert.IsTrue(candlesList.Any(), $"No candles received for {delay}");
+        }
+
+        [TestMethod]
+        public async Task GetHistoricalCandles()
+        {
+            var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
+            var resolutionTime = TimeSpan.FromMinutes(5);
+            var lockObj = new object();
+
+            var responseList = new List<string>();
+            CandleEvent.SubscribeHistoricalCandles(
+                     pairId,
+                     c =>
+                     {
+                         responseList.Add(c);
+                     },
+                     (int)resolutionTime.TotalSeconds);
+
+            await Task.Delay(TimeSpan.FromSeconds(30));
+            CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            Assert.IsTrue(responseList.Any());
         }
 
 

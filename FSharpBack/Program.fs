@@ -309,6 +309,8 @@ module Logic =
     let milisecondsInMinute = 60000
     let routerAddress = "0xe592427a0aece92de3edee1f18e0157c05861564"
     let maxUInt256StringRepresentation = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+    let exactInputSingleId = "0x414bf389"
+    let exactInputId = "0xc04b8d59"
     
 
     let filterSwapsInScope(swaps: Requests.Swap list, timestampAfter: int64, timestampBefore: int64) =
@@ -376,8 +378,8 @@ module Logic =
                            |> Async.AwaitTask
             try
                 let events = receipt.Logs.DecodeAllEvents<TransferEventDTO>()
-                if events.Count = 2 then return getSingleInfoFromRouter transaction events
-                elif events.Count = 4 then return getSimpleInfoFromRouter transaction events
+                if transaction.Input.Contains(exactInputId) then return getSingleInfoFromRouter transaction events
+                elif transaction.Input.Contains(exactInputSingleId) then return getSimpleInfoFromRouter transaction events
                 else return ("", "", 0I, 0I)
             with
             | _ -> return ("", "", 0I, 0I)
@@ -531,20 +533,15 @@ type TransferEvent() =
 [<EntryPoint>]
 let main args =
     let pairId = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
-    let resolutionTime = new TimeSpan(0, 60, 0)
+    let resolutionTime = new TimeSpan(0, 30, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
 
-    (*let transactionHash = "0x36c939bdac02b6ef98df06b24c482219a92d8512774c506d9e361d0f1b1e5a58"
+    (*let transactionHash = "0x199f24eaa2ba17e72bd66cd8479b55ae7d38bf07cf70d026a406453362947aa1"
     
     let transaction  = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
                        |> Async.AwaitTask
-                       |> Async.RunSynchronously
-
-    let result = (new ABIEncode()).GetABIEncoded("exactInput").ToHex()
-    (new Nethereum.ABI.FunctionEncoding.FunctionCallEncoder()).EncodeRequest((ExactInputParams))
-
-    let ifContains = transaction.Input.Contains(result)*)
+                       |> Async.RunSynchronously*)
 
     0

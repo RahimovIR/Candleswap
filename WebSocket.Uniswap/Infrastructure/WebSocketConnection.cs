@@ -87,7 +87,7 @@ namespace WebSocket.Uniswap.Infrastructure
                             OnReceivePingPong(webSocketMessage);
                         }
                         else if (webSocketMessage.Contains("candles"))
-                            await OnReceiveCandles(webSocketMessage);
+                            OnReceiveCandlesSubscribeRequest(webSocketMessage);
                         else
                             OnReceiveText(webSocketMessage);
                     }
@@ -125,7 +125,7 @@ namespace WebSocket.Uniswap.Infrastructure
             ReceiveCandleUpdate?.Invoke(this, candle);
         }
 
-        private async Task OnReceiveCandles(string webSocketMessage)
+        private void OnReceiveCandlesSubscribeRequest(string webSocketMessage)
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
@@ -136,6 +136,21 @@ namespace WebSocket.Uniswap.Infrastructure
             };
 
             CandleEvent.SubscribeCandles(arrayKeyParam[2], OnCandleUpdateReceived, resolution);
+
+            ReceiveText?.Invoke(this, webSocketMessage);
+        }
+
+        private void OnReceiveCandlesUnsubscribeRequest(string webSocketMessage)
+        {
+            var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
+            var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
+            int resolution = arrayKeyParam[1] switch 
+            {
+                "1m" => 60,
+                _ => 10
+            };
+
+            CandleEvent.UnsubscribeCandles(arrayKeyParam[2], resolution);
 
             ReceiveText?.Invoke(this, webSocketMessage);
         }

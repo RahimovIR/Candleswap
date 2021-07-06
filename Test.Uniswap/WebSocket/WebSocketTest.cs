@@ -22,18 +22,32 @@ namespace Test.Uniswap
         {
             var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
             var resolutionTime = TimeSpan.FromSeconds(5);
+            var cancelDelay = new CancellationTokenSource();
 
             var responseList = new List<string>();
             CandleEvent.SubscribeCandles(
                      pairId,
                      c =>
                      {
+                         Console.WriteLine(c);
                          responseList.Add(c);
+                         // stop waiting if a response came
+                         cancelDelay.Cancel();
                      },
                      (int)resolutionTime.TotalSeconds);
 
-            await Task.Delay(TimeSpan.FromSeconds(30));
-            CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30), cancelDelay.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                Console.WriteLine("Awaiting was canceled: a response came.");
+            }
+            finally
+            {
+                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            }
             Assert.IsTrue(responseList.Any());
         }
 
@@ -41,47 +55,147 @@ namespace Test.Uniswap
         public async Task GetCandles_PassWhenCandleReceived()
         {
             var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
-            var resolutionTime = TimeSpan.FromMinutes(5);
+            var resolutionTime = TimeSpan.FromSeconds(5);
+            var cancelDelay = new CancellationTokenSource();
 
             var candlesList = new List<string>();
             CandleEvent.SubscribeCandles(
                      pairId,
                      c =>
                      {
+                         Console.WriteLine(c);
                          if (c.Contains("_open"))
                          {
                              candlesList.Add(c);
+
+                             // stop waiting if a response came
+                             cancelDelay.Cancel();
                          }
                      },
                      (int)resolutionTime.TotalSeconds);
 
-            TimeSpan delay = TimeSpan.FromMinutes(6);
-            await Task.Delay(delay);
-            CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            TimeSpan delay = TimeSpan.FromMinutes(5);
+
+            try
+            {
+                await Task.Delay(delay, cancelDelay.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                Console.WriteLine("Awaiting was canceled: a candle came.");
+            }
+            finally
+            {
+                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            }
             Assert.IsTrue(candlesList.Any(), $"No candles received for {delay}");
         }
 
         [TestMethod]
-        public async Task GetHistoricalCandles()
+        public async Task GetHistoricalCandles_PassWhenAny()
         {
             var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
-            var resolutionTime = TimeSpan.FromMinutes(5);
-            var lockObj = new object();
+            var resolutionTime = TimeSpan.FromSeconds(5);
+            var cancelDelay = new CancellationTokenSource();
 
             var responseList = new List<string>();
             CandleEvent.SubscribeHistoricalCandles(
                      pairId,
                      c =>
                      {
+                         Console.WriteLine(c);
                          responseList.Add(c);
+                         // stop waiting if a response came
+                         cancelDelay.Cancel();
                      },
                      (int)resolutionTime.TotalSeconds);
 
-            await Task.Delay(TimeSpan.FromSeconds(30));
-            CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            try
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1), cancelDelay.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                Console.WriteLine("Awaiting was canceled: a response came.");
+            }
+            finally
+            {
+                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            }
             Assert.IsTrue(responseList.Any());
         }
 
+        [TestMethod]
+        public async Task GetHistoricalCandles_PassWhenCandleReceived()
+        {
+            var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
+            var resolutionTime = TimeSpan.FromMinutes(5);
+            var cancelDelay = new CancellationTokenSource();
+
+            var candlesList = new List<string>();
+            CandleEvent.SubscribeHistoricalCandles(
+                     pairId,
+                     c =>
+                     {
+                         Console.WriteLine(c);
+                         if (c.Contains("_open"))
+                         {
+                             candlesList.Add(c);
+
+                             // stop waiting if a response came
+                             cancelDelay.Cancel();
+                         }
+                     },
+                     (int)resolutionTime.TotalSeconds);
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromMinutes(5), cancelDelay.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                Console.WriteLine("Awaiting was canceled: a candle came.");
+            }
+            finally
+            {
+                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+            }
+            Assert.IsTrue(candlesList.Any());
+        }
+
+        [TestMethod]
+        public async Task GetCandlesFromWebsocket()
+        {
+            var buffer = new byte[1024 * 4];
+            var responseList = new List<string>();
+            var client = await CreateConnectWithLocalWebSocket();
+
+            string subscribeRequest = @"{
+                            ""event"": ""subscribe"",
+                            ""channel"": ""candles"",
+                            ""key"": ""trade:10s:0x000ea4a83acefdd62b1b43e9ccc281f442651520""
+                            }";
+            var bytes = Encoding.UTF8.GetBytes(subscribeRequest);
+            await client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+            var attemptsCount = 0;
+            var cancelReceive = new CancellationTokenSource();
+
+            while (!responseList.Any() && attemptsCount < 10)
+            {
+                var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), cancelReceive.Token);
+
+                string response = Encoding.UTF8.GetString(buffer, 0, result.Count).ToUpperInvariant();
+                Console.WriteLine(response);
+                if (response.Contains("NO SWAPS") || response.Contains("_OPEN"))
+                {
+                    responseList.Add(response.TrimEnd('\0'));
+                }
+                attemptsCount++;
+            }
+            cancelReceive.Cancel();
+            await client.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+            Assert.IsTrue(responseList.Any());
+        }
 
         [TestMethod]
         public async Task PlayPingPongWebSocketTest()

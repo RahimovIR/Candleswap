@@ -11,7 +11,7 @@ namespace WebSocket.Uniswap.Infrastructure
 {
     public static class CandleEvent
     {
-        private static SortedDictionary<(string, int), CancellationTokenSource> EventsInvoked = new();
+        private static readonly SortedDictionary<(string, int), CancellationTokenSource> EventsInvoked = new();
 
         public static void SubscribeCandles(string uniswapId, Action<string> onCandle, int resolutionSeconds)
         {
@@ -30,9 +30,31 @@ namespace WebSocket.Uniswap.Infrastructure
             });
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
-            global::Program.Logic.getCandle(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
-                                            web3);
+            Task.Run(() =>
+                global::Program.Logic.getCandle(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                                            web3), cancelToken.Token);
+        }
 
+        public static void SubscribeHistoricalCandles(string uniswapId, Action<string> onCandle, int resolutionSeconds)
+        {
+            if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out _))
+            {
+                return;
+            }
+            else
+            {
+                EventsInvoked.Add((uniswapId, resolutionSeconds), new CancellationTokenSource());
+            }
+            EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out var cancelToken);
+            var fsharpFunc = FuncConvert.ToFSharpFunc<string>(c =>
+            {
+                onCandle(c);
+            });
+            var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
+
+            Task.Run(() =>
+                global::Program.Logic.getCandles(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                                            web3), cancelToken.Token);
         }
 
         public static void UnsubscribeCandles(string uniswapId, int resolutionSeconds)

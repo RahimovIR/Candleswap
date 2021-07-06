@@ -503,12 +503,15 @@ module Logic =
 
             while block.Timestamp.Value > resolutionTimeAgoUnix  do
                 let swapTransactions = filterSwapTransactions block.Transactions |> Array.rev
-                let swapTransactionReceipts =
+                let map (swapTransaction:Transaction) = 
+                    async{
+                        return! web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(swapTransaction.TransactionHash)
+                                |> Async.AwaitTask                 
+                    }
+                let! swapTransactionReceipts =
                     swapTransactions
-                    |> Array.map (fun swapTransaction ->
-                                      (web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(swapTransaction.TransactionHash)
-                                      |> Async.AwaitTask
-                                      |> Async.RunSynchronously))
+                    |> Array.map map
+                    |> Async.Parallel
                 let swapTransactionWithReceipts = Array.map2 (fun transaction receipt -> (transaction, receipt)) 
                                                              swapTransactions swapTransactionReceipts
                 let! (_candle, _wasRequiredTransactionsInPeriodOfTime, 
@@ -584,15 +587,6 @@ module Logic =
             |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime pairId callback web3
             |> Async.RunSynchronously
             currentTime <- currentTime.Subtract(resolutionTime)
-       
-type TransferEvent() = 
-    interface IEventDTO
-    [<Parameter("address", "_from", 1, true)>]
-    member val public From = Unchecked.defaultof<string> with get, set
-    [<Parameter("address", "_to", 2, true)>]
-    member val public To = Unchecked.defaultof<string> with get, set
-    [<Parameter("uint256", "_value", 3)>]
-    member val public Value = Unchecked.defaultof<BigInteger> with get, set
 
             
 
@@ -611,4 +605,5 @@ let main args =
                        |> Async.RunSynchronously
     let before = transaction.Input
     let after = transaction.Input.Trim(Logic.exactOutputSingleId.ToCharArray())*)
+    
     0

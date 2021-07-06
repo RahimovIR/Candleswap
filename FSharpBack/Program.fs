@@ -310,7 +310,10 @@ module Logic =
     let routerAddress = "0xe592427a0aece92de3edee1f18e0157c05861564"
     let maxUInt256StringRepresentation = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
     let exactInputSingleId = "0x414bf389"
+    let exactOutputSingleId = "0xdb3e2198"
     let exactInputId = "0xc04b8d59"
+    let exactOutputId = "0xf28c0498"
+    let multicallId = "0xac9650d8"
     
 
     let filterSwapsInScope(swaps: Requests.Swap list, timestampAfter: int64, timestampBefore: int64) =
@@ -321,6 +324,25 @@ module Logic =
 
     let filterSwapTransactions (transactions: Transaction[]) =
         transactions |> Array.filter (fun transaction -> transaction.To = routerAddress && transaction.Input <> "0x")
+
+    let decodeMulticall input (func:FunctionMessage) = 
+        try
+            let functions = (new MulticallFunction()).DecodeInput(input).Data
+            let mutable decodedInput = new ExactInputFunction()
+            let mutable successfullyDecoded = false
+            for func in functions do
+                try
+                    decodedInput <- (new ExactInputFunction()).DecodeInput(func.ToHex())
+                    successfullyDecoded <- true
+                with
+                | _ -> ()
+            if successfullyDecoded then decodedInput
+            else new ExactInputFunction()
+        with
+        | _ -> try
+                   (new ExactInputFunction()).DecodeInput(input)//ExactInputSingleFunction!!!
+               with
+               | _ -> new ExactInputFunction()
 
     let decodeInputSingle input = 
         (new ExactInputSingleFunction()).DecodeInput(input)
@@ -371,21 +393,20 @@ module Logic =
         with
         | _ -> ("", "", 0I, 0I)
     
-    let getInfoFromRouterAsync (transaction:Transaction) (web3:Web3) =
-        async{
-            printfn "%s" transaction.TransactionHash
-            let! receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
-                           |> Async.AwaitTask
-            try
-                let events = receipt.Logs.DecodeAllEvents<TransferEventDTO>()
-                if transaction.Input.Contains(exactInputId) then return getSingleInfoFromRouter transaction events
-                elif transaction.Input.Contains(exactInputSingleId) then return getSimpleInfoFromRouter transaction events
-                else return ("", "", 0I, 0I)
-            with
-            | _ -> return ("", "", 0I, 0I)
-        }
+    let getInfoFromRouter (transaction:Transaction) (transactionReceipt:TransactionReceipt) =
+        printfn "%s" transaction.TransactionHash
+        try
+            //if transaction.Input.Contains(exactOutputId) then printfn "%s" transaction.TransactionHash
+            let events = transactionReceipt.Logs.DecodeAllEvents<TransferEventDTO>()
+            if transaction.Input.Contains(exactInputId) then getSingleInfoFromRouter transaction events
+            elif transaction.Input.Contains(exactInputSingleId) then getSimpleInfoFromRouter transaction events
+            //elif transaction.Input.Contains(exactOutputId) then return 
+            //elif transaction.Input.Contains(exactOutputSingleId) then return
+            else ("", "", 0I, 0I)
+        with
+        | _ -> ("", "", 0I, 0I)
    
-    let partlyBuildCandleAsync (block:BlockWithTransactions) token0Id token1Id (candle:Candle)
+    (*let partlyBuildCandleAsync (block:BlockWithTransactions) token0Id token1Id (candle:Candle)
                                wasRequiredTransactionsInPeriodOfTime firstIterFlag (web3:Web3) =
         async{
             let mutable closePrice =  candle.close
@@ -396,14 +417,50 @@ module Logic =
             let mutable _wasRequiredTransactionsInPeriodOfTime = wasRequiredTransactionsInPeriodOfTime
             let mutable _firstIterFlag = firstIterFlag
 
-            let transactions = block.Transactions
-            let swapTransactions = filterSwapTransactions transactions |> Array.rev
+            let swapTransactions = filterSwapTransactions block.Transactions |> Array.rev
             for swapTransaction in swapTransactions do
-                let! (tokenInAddress, tokenOutAddress, 
-                      amountIn, amountOut) = getInfoFromRouterAsync swapTransaction web3
+                let! transactionReceipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(swapTransaction.TransactionHash)
+                                          |> Async.AwaitTask
+                let (tokenInAddress, tokenOutAddress, 
+                     amountIn, amountOut) = getInfoFromRouter swapTransaction transactionReceipt
                 if token0Id = tokenInAddress && token1Id = tokenOutAddress
                 then _wasRequiredTransactionsInPeriodOfTime <- true
                      printfn "\n\n\nTRANSACTION!!!\n%s\n\n" swapTransaction.TransactionHash
+                     let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
+                     if _firstIterFlag then closePrice <- currentPrice
+                                            _firstIterFlag <- false
+                     if (currentPrice > highPrice) then highPrice <- currentPrice
+                     if (currentPrice < lowPrice) then lowPrice <- currentPrice
+                     openPrice <- currentPrice
+                     volume <- volume + 1u
+            return ({ 
+                close = closePrice;
+                low = lowPrice;
+                high = highPrice;
+                _open = openPrice;
+                volume = volume;
+            }, _wasRequiredTransactionsInPeriodOfTime, _firstIterFlag)
+        }*)
+
+    let partlyBuildCandle (transactionsWithReceipts:Tuple<Transaction, TransactionReceipt>[]) token0Id token1Id (candle:Candle)
+                          wasRequiredTransactionsInPeriodOfTime firstIterFlag (web3:Web3) =
+        async{
+            let mutable closePrice =  candle.close
+            let mutable lowPrice = candle.low
+            let mutable highPrice = candle.high
+            let mutable openPrice = candle._open
+            let mutable volume = candle.volume
+            let mutable _wasRequiredTransactionsInPeriodOfTime = wasRequiredTransactionsInPeriodOfTime
+            let mutable _firstIterFlag = firstIterFlag
+
+            //let swapTransactions = filterSwapTransactions block.Transactions |> Array.rev
+            for transactionWithReceipt in transactionsWithReceipts do
+                let (transaction, receipt) = transactionWithReceipt
+                let (tokenInAddress, tokenOutAddress, 
+                     amountIn, amountOut) = getInfoFromRouter transaction receipt
+                if token0Id = tokenInAddress && token1Id = tokenOutAddress
+                then _wasRequiredTransactionsInPeriodOfTime <- true
+                     printfn "\n\n\nTRANSACTION!!!\n%s\n\n" transaction.TransactionHash
                      let currentPrice = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
                      if _firstIterFlag then closePrice <- currentPrice
                                             _firstIterFlag <- false
@@ -445,9 +502,18 @@ module Logic =
             let mutable firstIterFlag = true
 
             while block.Timestamp.Value > resolutionTimeAgoUnix  do
+                let swapTransactions = filterSwapTransactions block.Transactions |> Array.rev
+                let swapTransactionReceipts =
+                    swapTransactions
+                    |> Array.map (fun swapTransaction ->
+                                      (web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(swapTransaction.TransactionHash)
+                                      |> Async.AwaitTask
+                                      |> Async.RunSynchronously))
+                let swapTransactionWithReceipts = Array.map2 (fun transaction receipt -> (transaction, receipt)) 
+                                                             swapTransactions swapTransactionReceipts
                 let! (_candle, _wasRequiredTransactionsInPeriodOfTime, 
-                      _firstIterFlag) = partlyBuildCandleAsync block token0Id token1Id candle
-                                                               wasRequiredTransactionsInPeriodOfTime firstIterFlag web3
+                      _firstIterFlag) = partlyBuildCandle swapTransactionWithReceipts token0Id token1Id candle
+                                                          wasRequiredTransactionsInPeriodOfTime firstIterFlag web3
                 candle <- _candle
                 wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag <- _firstIterFlag
@@ -533,15 +599,16 @@ type TransferEvent() =
 [<EntryPoint>]
 let main args =
     let pairId = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
-    let resolutionTime = new TimeSpan(0, 30, 0)
+    let resolutionTime = new TimeSpan(0, 5, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
 
-    (*let transactionHash = "0x199f24eaa2ba17e72bd66cd8479b55ae7d38bf07cf70d026a406453362947aa1"
+    (*let transactionHash = "0x383adc13027d4799e03ba51f0bc245317e9ad22f905a52b2deffea155a0b4a93"
     
     let transaction  = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
                        |> Async.AwaitTask
-                       |> Async.RunSynchronously*)
-
+                       |> Async.RunSynchronously
+    let before = transaction.Input
+    let after = transaction.Input.Trim(Logic.exactOutputSingleId.ToCharArray())*)
     0

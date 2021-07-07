@@ -398,8 +398,8 @@ module Logic =
         try
             //if transaction.Input.Contains(exactOutputId) then printfn "%s" transaction.TransactionHash
             let events = transactionReceipt.Logs.DecodeAllEvents<TransferEventDTO>()
-            if transaction.Input.Contains(exactInputId) then getSingleInfoFromRouter transaction events
-            elif transaction.Input.Contains(exactInputSingleId) then getSimpleInfoFromRouter transaction events
+            if transaction.Input.Contains(exactInputId) then getSimpleInfoFromRouter transaction events
+            elif transaction.Input.Contains(exactInputSingleId) then getSingleInfoFromRouter transaction events
             //elif transaction.Input.Contains(exactOutputId) then return 
             //elif transaction.Input.Contains(exactOutputSingleId) then return
             else ("", "", 0I, 0I)
@@ -602,7 +602,7 @@ let main args =
     let resolutionTime = new TimeSpan(0, 5, 0)
     let web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
-    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
+    //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
 
     (*let transactionHash = "0x383adc13027d4799e03ba51f0bc245317e9ad22f905a52b2deffea155a0b4a93"
     
@@ -611,4 +611,7 @@ let main args =
                        |> Async.RunSynchronously
     let before = transaction.Input
     let after = transaction.Input.Trim(Logic.exactOutputSingleId.ToCharArray())*)
+    //let res  = (new ABIEncode()).GetABIEncoded()
+    //let result = (new ABIEncode()).GetABIEncodedPacked("ff".ToHexUTF8(), "0x1f98431c8ad98523631ae4a59f267346ea31f984", )
+
     0

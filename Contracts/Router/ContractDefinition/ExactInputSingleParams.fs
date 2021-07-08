@@ -7,6 +7,7 @@ open System.Numerics
 open Nethereum.Hex.HexTypes
 open Nethereum.ABI.FunctionEncoding.Attributes
 
+
     type ExactInputSingleParams() =
             [<Parameter("address", "tokenIn", 1)>]
             member val public TokenIn = Unchecked.defaultof<string> with get, set

@@ -31,7 +31,7 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                global::Program.Logic.getCandle(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                global::FSharpBack.Logic.getCandle(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
                                             web3), cancelToken.Token);
         }
 
@@ -53,7 +53,7 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                global::Program.Logic.getCandles(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                global::FSharpBack.Logic.getCandles(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
                                             web3), cancelToken.Token);
         }
 

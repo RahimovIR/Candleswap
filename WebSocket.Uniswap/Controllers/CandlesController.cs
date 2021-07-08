@@ -42,7 +42,7 @@ namespace WebSocket.Uniswap.Controllers
                 : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;
             limit ??= 10;
 
-            var candles = await global::Program.DB.fetchCandlesTask(symbol, periodSeconds);
+            var candles = await global::FSharpBack.DB.fetchCandlesTask(symbol, periodSeconds);
 
             return candles.Where(c => c.datetime >= startDateTime 
             && c.datetime <= endDateTime)

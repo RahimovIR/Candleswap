@@ -1,5 +1,4 @@
-﻿using Contracts.MystToken.ContractDefinition;
-using Contracts.Router.ContractDefinition;
+﻿using Contracts.UniswapV3Router.ContractDefinition;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -15,6 +14,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static FSharpBack.Logic.SwapRouterV3;
 using static FSharpBack.Logic;
 
 namespace Test.Uniswap
@@ -24,7 +24,7 @@ namespace Test.Uniswap
     {
         [TestMethod]
         [DataRow(3, 1)]
-        public async Task GetCandles_Offline(int tuplesCount, int swapsCount)
+        public async Task GetV3Candles_Offline(int tuplesCount, int swapsCount)
         {
             var rnd = new Random();
             string configJson;
@@ -76,7 +76,7 @@ namespace Test.Uniswap
                     + To32ByteWord(inputSingleParams.SqrtPriceLimitX96);
                 input += addParams.Replace("0x", string.Empty);
 
-                var transaction = new Transaction() { Input = input };
+                var transaction = new Transaction() { Input = input, To = routerAddress };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
             var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(), 

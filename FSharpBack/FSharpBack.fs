@@ -442,16 +442,16 @@ module Logic =
         let routerAddress =
             "0xe592427a0aece92de3edee1f18e0157c05861564"
 
-        let private exactInputSingleId = "0x414bf389"
-        let private exactOutputSingleId = "0xdb3e2198"
-        let private exactInputId = "0xc04b8d59"
-        let private exactOutputId = "0xf28c0498"
-        let private multicallId = "0xac9650d8"
-        let private lengthForSimpleCall = 648
-        let private lengthForSingleCall = 520
+        let exactInputSingleId = "0x414bf389"
+        let exactOutputSingleId = "0xdb3e2198"
+        let exactInputId = "0xc04b8d59"
+        let exactOutputId = "0xf28c0498"
+        let multicallId = "0xac9650d8"
+        let lengthForSimpleCall = 648
+        let lengthForSingleCall = 520
 
         [<Event("Swap")>]
-        type private SwapEventDTO() =
+        type SwapEventDTO() =
             inherit EventDTO()
 
             [<Parameter("address", "sender", 1, true)>]
@@ -476,7 +476,7 @@ module Logic =
             member val Tick = Unchecked.defaultof<BigInteger> with get, set
 
 
-        let private getSingleInfoFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput =
+        let getSingleInfoFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput =
             let amountIn =
                 if event.Amount0 < 0I then
                     event.Amount0 * (-1I)
@@ -505,7 +505,7 @@ module Logic =
                 ("", "", 0I, 0I)
 
 
-        let private getSimpleInfoFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput =
+        let getSimpleInfoFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput =
             let getAmount amount = 
                 if amount < 0I then amount * (-1I) else amount
             
@@ -543,7 +543,7 @@ module Logic =
             else
                 ("", "", 0I, 0I)
 
-        let private multicallToCall (multicall: string) length index =
+        let multicallToCall (multicall: string) length index =
             "0x" + multicall.Substring(index, length)
 
         let getInfoFromRouter (transaction: Transaction) (transactionReceipt: TransactionReceipt) =
@@ -584,18 +584,18 @@ module Logic =
     module SwapRouterV2 =
         let routerAddress = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
 
-        let private swapExactTokensForTokensId = "0x38ed1739"
-        let private swapTokensForExactTokensId = "0x8803dbee"
-        let private swapExactETHForTokensId = "0x7ff36ab5"
-        let private swapTokensForExactETHId = "0x4a25d94a"
-        let private swapExactTokensForETHId = "0x18cbafe5"
-        let private swapETHForExactTokensId = "0xfb3bdb41"
-        let private swapExactTokensForTokensSupportingFeeOnTransferTokensId = "0x5c11d795"
-        let private swapExactETHForTokensSupportingFeeOnTransferTokensId = "0xb6f9de95"
-        let private swapExactTokensForETHSupportingFeeOnTransferTokensId = "0x791ac947"
+        let swapExactTokensForTokensId = "0x38ed1739"
+        let swapTokensForExactTokensId = "0x8803dbee"
+        let swapExactETHForTokensId = "0x7ff36ab5"
+        let swapTokensForExactETHId = "0x4a25d94a"
+        let swapExactTokensForETHId = "0x18cbafe5"
+        let swapETHForExactTokensId = "0xfb3bdb41"
+        let swapExactTokensForTokensSupportingFeeOnTransferTokensId = "0x5c11d795"
+        let swapExactETHForTokensSupportingFeeOnTransferTokensId = "0xb6f9de95"
+        let swapExactTokensForETHSupportingFeeOnTransferTokensId = "0x791ac947"
 
         [<Event("Swap")>]
-        type private SwapEventDTO() =
+        type SwapEventDTO() =
             inherit EventDTO()
 
             [<Parameter("address", "sender", 1, true)>]
@@ -616,7 +616,7 @@ module Logic =
             [<Parameter("address", "to", 6, true)>]
             member val To = Unchecked.defaultof<string> with get, set
 
-        let private getTokensAndAmountsFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput = 
+        let getTokensAndAmountsFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput = 
             let getAmount amount0 amount1 =
                 if amount0 = 0I then amount1 else amount0
 

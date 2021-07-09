@@ -15,6 +15,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static FSharpBack.Logic;
 
 namespace Test.Uniswap
 {
@@ -22,8 +23,8 @@ namespace Test.Uniswap
     public class WebSocketOfflineTests
     {
         [TestMethod]
-        [DataRow(3)]
-        public async Task GetCandles_Offline(int tuplesCount)
+        [DataRow(3, 1)]
+        public async Task GetCandles_Offline(int tuplesCount, int swapsCount)
         {
             var rnd = new Random();
             string configJson;
@@ -37,52 +38,34 @@ namespace Test.Uniswap
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             for (var i = 0; i < tuplesCount; i++)
             {
-                var transferEvents = new TransferEventDTO[]
+                var swapEvents = new List<SwapEventDTO>();
+                for (int j = 0; j < swapsCount; j++)
                 {
-                    new TransferEventDTO() 
-                    {
-                        From = To32ByteWord(rnd.Next(0, 1000)),
-                        To = To32ByteWord(rnd.Next(0, 1000)),
-                        Value = rnd.Next(1, 1000000000)
-                    },
-                    new TransferEventDTO() 
-                    {
-                        From = To32ByteWord(rnd.Next(0, 1000)),
-                        To = To32ByteWord(rnd.Next(0, 1000)),
-                        Value = rnd.Next(1, 1000000000) 
-                    },
-                    new TransferEventDTO() 
-                    {
-                        From = To32ByteWord(rnd.Next(0, 1000)),
-                        To = To32ByteWord(rnd.Next(0, 1000)),
-                        Value = rnd.Next(1, 1000000000) 
-                    },
-                    new TransferEventDTO() 
-                    {
-                        From = To32ByteWord(rnd.Next(0, 1000)),
-                        To = To32ByteWord(rnd.Next(0, 1000)),
-                        Value = rnd.Next(1, 1000000000) 
-                    },
-                };
+                    swapEvents.Add(GenerateSwapEvent(rnd));
+                }
 
-                var transferEventsTokens = new List<JToken>();
-                foreach (var transferEvent in transferEvents)
+                var swapEventsTokens = new List<JToken>();
+                foreach (var swapEvent in swapEvents)
                 {
                     var transferJson = JObject.Parse(configJson);
-                    transferJson["data"] = To32ByteWord(transferEvent.Value);
+                    transferJson["data"] = To32ByteWord(swapEvent.Amount0)
+                        + (To32ByteWord(swapEvent.Amount1)
+                        + To32ByteWord(swapEvent.SqrtPriceX96)
+                        + To32ByteWord(swapEvent.Liquidity)
+                        + To32ByteWord(swapEvent.Tick)).Replace("0x", string.Empty);
                     transferJson["topics"] = new JArray()
                     {
                         transferJson["signature"],
-                        transferEvent.To,
-                        transferEvent.From
+                        swapEvent.Recipient,
+                        swapEvent.Sender
                     };
                     transferJson.Remove("signature");
-                    transferEventsTokens.Add(transferJson);                    
+                    swapEventsTokens.Add(transferJson);
                 }
-                var receipt = new TransactionReceipt { Logs = JArray.FromObject(transferEventsTokens) };
+                var receipt = new TransactionReceipt { Logs = JArray.FromObject(swapEventsTokens) };
                 var inputSingleParams = new ExactInputSingleParams() { TokenIn = tokenIn, TokenOut = tokenOut };
 
-                var input = Program.Logic.exactInputSingleId;
+                var input = exactInputSingleId;
                 var addParams = inputSingleParams.TokenIn
                     + inputSingleParams.TokenOut
                     + To32ByteWord(inputSingleParams.Fee)
@@ -91,23 +74,21 @@ namespace Test.Uniswap
                     + To32ByteWord(inputSingleParams.AmountIn)
                     + To32ByteWord(inputSingleParams.AmountOutMinimum)
                     + To32ByteWord(inputSingleParams.SqrtPriceLimitX96);
-                addParams = addParams.Replace("0x", string.Empty);
-                input += addParams;
+                input += addParams.Replace("0x", string.Empty);
 
                 var transaction = new Transaction() { Input = input };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
-            var computation = Program.Logic.partlyBuildCandle(transactionsWithReceipts.ToArray(), 
+            var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(), 
                 // substring from 26th element due to tokens being decoded in 16 bytes, not 32
                 tokenIn[26..].Insert(0, "0x"), 
                 tokenOut[26..].Insert(0, "0x"),
-                new Program.Candle(_open: 0, high: 0, 
-                    low: BigDecimal.Parse(Program.Logic.maxUInt256StringRepresentation),
+                new FSharpBack.Candle(_open: 0, high: 0, 
+                    low: BigDecimal.Parse(maxUInt256StringRepresentation),
                     close: 0, volume: 0), 
-                wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true,
-                new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e"));
+                wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
             var cancelBuildCandle = new CancellationTokenSource();
-            Program.Candle candle = (await FSharpAsync.StartAsTask(computation,
+            FSharpBack.Candle candle = (await FSharpAsync.StartAsTask(computation,
                             new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
                             new FSharpOption<CancellationToken>(cancelBuildCandle.Token))).Item1;
             Console.WriteLine(candle);
@@ -117,6 +98,20 @@ namespace Test.Uniswap
             Assert.IsTrue(candle.low != 0);
             Assert.IsTrue(candle.close != 0);
             Assert.IsTrue(candle.volume != 0);
+        }
+
+        private SwapEventDTO GenerateSwapEvent(Random rnd)
+        {
+            return new SwapEventDTO()
+            {
+                Amount0 = rnd.Next(-10000, 0),
+                Amount1 = rnd.Next(0, 10000),
+                Sender = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant(),
+                Recipient = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant(),
+                SqrtPriceX96 = rnd.Next(0, 10000),
+                Liquidity = rnd.Next(0, 10000000),
+                Tick = rnd.Next(-10000, 0)
+            };
         }
 
         public string To32ByteWord(object item)
@@ -131,14 +126,12 @@ namespace Test.Uniswap
                     {
                         while (str.Length < 64)
                         {
-                            str = str.Insert(!str.Contains("0x", StringComparison.CurrentCulture) 
-                                ? 0 
-                                : str.IndexOf("0x") + 2, "0");
+                            str = str.Insert(!str.Contains("0x", StringComparison.CurrentCulture)
+                                    ? 0
+                                    : str.IndexOf("0x") + 2, "0");
+                            
                         }
-                        if (!str.Contains("0x", StringComparison.CurrentCulture))
-                        {
-                            str = str.Insert(0, "0x");
-                        }
+                        str = str.Insert(0, "0x");
                         return str;
                     }
 

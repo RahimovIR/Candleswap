@@ -1,4 +1,4 @@
-namespace Contracts.Router.ContractDefinition
+namespace Contracts.UniswapV3Router.ContractDefinition
 
 open System
 open System.Threading.Tasks

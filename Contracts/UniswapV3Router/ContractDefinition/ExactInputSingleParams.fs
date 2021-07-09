@@ -1,4 +1,4 @@
-namespace Contracts.Router.ContractDefinition
+namespace Contracts.UniswapV3Router.ContractDefinition
 
 open System
 open System.Threading.Tasks
@@ -6,7 +6,6 @@ open System.Collections.Generic
 open System.Numerics
 open Nethereum.Hex.HexTypes
 open Nethereum.ABI.FunctionEncoding.Attributes
-
 
     type ExactInputSingleParams() =
             [<Parameter("address", "tokenIn", 1)>]

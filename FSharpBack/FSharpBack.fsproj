@@ -13,7 +13,6 @@
     <PackageReference Include="Dapper" Version="2.0.78" />
     <PackageReference Include="FSharp.Data.GraphQL.Client" Version="1.0.7" />
     <PackageReference Include="Nethereum.ABI" Version="3.8.0" />
-    <PackageReference Include="Nethereum.Autogen.ContractApi" Version="3.6.2" />
     <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.114.4" />

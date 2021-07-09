@@ -1,4 +1,4 @@
-namespace Contracts.Router
+namespace Contracts.UniswapV3Router
 
 open System
 open System.Threading.Tasks
@@ -12,25 +12,25 @@ open Nethereum.Contracts.CQS
 open Nethereum.Contracts.ContractHandlers
 open Nethereum.Contracts
 open System.Threading
-open Contracts.Router.ContractDefinition
+open Contracts.UniswapV3Router.ContractDefinition
 
 
-    type RouterService (web3: Web3, contractAddress: string) =
+    type UniswapV3RouterService (web3: Web3, contractAddress: string) =
     
         member val Web3 = web3 with get
         member val ContractHandler = web3.Eth.GetContractHandler(contractAddress) with get
     
-        static member DeployContractAndWaitForReceiptAsync(web3: Web3, routerDeployment: RouterDeployment, ?cancellationTokenSource : CancellationTokenSource): Task<TransactionReceipt> = 
+        static member DeployContractAndWaitForReceiptAsync(web3: Web3, uniswapV3RouterDeployment: UniswapV3RouterDeployment, ?cancellationTokenSource : CancellationTokenSource): Task<TransactionReceipt> = 
             let cancellationTokenSourceVal = defaultArg cancellationTokenSource null
-            web3.Eth.GetContractDeploymentHandler<RouterDeployment>().SendRequestAndWaitForReceiptAsync(routerDeployment, cancellationTokenSourceVal)
+            web3.Eth.GetContractDeploymentHandler<UniswapV3RouterDeployment>().SendRequestAndWaitForReceiptAsync(uniswapV3RouterDeployment, cancellationTokenSourceVal)
         
-        static member DeployContractAsync(web3: Web3, routerDeployment: RouterDeployment): Task<string> =
-            web3.Eth.GetContractDeploymentHandler<RouterDeployment>().SendRequestAsync(routerDeployment)
+        static member DeployContractAsync(web3: Web3, uniswapV3RouterDeployment: UniswapV3RouterDeployment): Task<string> =
+            web3.Eth.GetContractDeploymentHandler<UniswapV3RouterDeployment>().SendRequestAsync(uniswapV3RouterDeployment)
         
-        static member DeployContractAndGetServiceAsync(web3: Web3, routerDeployment: RouterDeployment, ?cancellationTokenSource : CancellationTokenSource) = async {
+        static member DeployContractAndGetServiceAsync(web3: Web3, uniswapV3RouterDeployment: UniswapV3RouterDeployment, ?cancellationTokenSource : CancellationTokenSource) = async {
             let cancellationTokenSourceVal = defaultArg cancellationTokenSource null
-            let! receipt = RouterService.DeployContractAndWaitForReceiptAsync(web3, routerDeployment, cancellationTokenSourceVal) |> Async.AwaitTask
-            return new RouterService(web3, receipt.ContractAddress);
+            let! receipt = UniswapV3RouterService.DeployContractAndWaitForReceiptAsync(web3, uniswapV3RouterDeployment, cancellationTokenSourceVal) |> Async.AwaitTask
+            return new UniswapV3RouterService(web3, receipt.ContractAddress);
             }
     
         member this.WETH9QueryAsync(wETH9Function: WETH9Function, ?blockParameter: BlockParameter): Task<string> =

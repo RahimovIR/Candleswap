@@ -5,23 +5,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="Abi\MystToken.abi" />
-    <None Include="Abi\Path.abi" />
-    <None Include="Abi\Router.abi" />
-    <None Include="Binaries\MystToken.bin" />
-    <None Include="Binaries\Path.bin" />
-    <None Include="Binaries\Router.bin" />
+    <None Include="Abi\UniswapV2Router.abi" />
+    <None Include="Abi\UniswapV3Router.abi" />
+    <None Include="Binaries\UniswapV2Router.bin" />
+    <None Include="Binaries\UniswapV3Router.bin" />
     <Compile Include="Library.fs" />
-    <Compile Include="MystToken\ContractDefinition\MystTokenDefinition.fs" />
-    <Compile Include="MystToken\MystTokenService.fs" />
-    <Compile Include="Path\ContractDefinition\PathDefinition.fs" />
-    <Compile Include="Path\PathService.fs" />
-    <Compile Include="Router\ContractDefinition\ExactInputParams.fs" />
-    <Compile Include="Router\ContractDefinition\ExactInputSingleParams.fs" />
-    <Compile Include="Router\ContractDefinition\ExactOutputParams.fs" />
-    <Compile Include="Router\ContractDefinition\ExactOutputSingleParams.fs" />
-    <Compile Include="Router\ContractDefinition\RouterDefinition.fs" />
-    <Compile Include="Router\RouterService.fs" />
+    <Compile Include="UniswapV2Router\ContractDefinition\UniswapV2RouterDefinition.fs" />
+    <Compile Include="UniswapV2Router\UniswapV2RouterService.fs" />
+    <Compile Include="UniswapV3Router\ContractDefinition\ExactInputParams.fs" />
+    <Compile Include="UniswapV3Router\ContractDefinition\ExactInputSingleParams.fs" />
+    <Compile Include="UniswapV3Router\ContractDefinition\ExactOutputParams.fs" />
+    <Compile Include="UniswapV3Router\ContractDefinition\ExactOutputSingleParams.fs" />
+    <Compile Include="UniswapV3Router\ContractDefinition\UniswapV3RouterDefinition.fs" />
+    <Compile Include="UniswapV3Router\UniswapV3RouterService.fs" />
   </ItemGroup>
 
   <ItemGroup>

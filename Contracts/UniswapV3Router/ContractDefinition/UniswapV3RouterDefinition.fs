@@ -1,4 +1,4 @@
-namespace Contracts.Router.ContractDefinition
+namespace Contracts.UniswapV3Router.ContractDefinition
 
 open System
 open System.Threading.Tasks
@@ -14,12 +14,12 @@ open System.Threading
 
     
     
-    type RouterDeployment(byteCode: string) =
+    type UniswapV3RouterDeployment(byteCode: string) =
         inherit ContractDeploymentMessage(byteCode)
         
         static let BYTECODE = ""
         
-        new() = RouterDeployment(BYTECODE)
+        new() = UniswapV3RouterDeployment(BYTECODE)
         
             [<Parameter("address", "_factory", 1)>]
             member val public Factory = Unchecked.defaultof<string> with get, set

@@ -15,7 +15,9 @@ open Nethereum.ABI.FunctionEncoding.Attributes
 open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Contracts
 open Contracts.UniswapV3Router.ContractDefinition
+open Contracts.UniswapV2Router.ContractDefinition
 open Nethereum.Util
+open System.Linq
 
 
 
@@ -449,7 +451,7 @@ module Logic =
         let private lengthForSingleCall = 520
 
         [<Event("Swap")>]
-        type SwapEventDTO() =
+        type private SwapEventDTO() =
             inherit EventDTO()
 
             [<Parameter("address", "sender", 1, true)>]
@@ -472,6 +474,7 @@ module Logic =
 
             [<Parameter("int24", "tick", 7, false)>]
             member val Tick = Unchecked.defaultof<BigInteger> with get, set
+
 
         let private getSingleInfoFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput =
             let amountIn =
@@ -503,17 +506,11 @@ module Logic =
 
 
         let private getSimpleInfoFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput =
-            let amountIn =
-                if event.Amount0 < 0I then
-                    event.Amount0 * (-1I)
-                else
-                    event.Amount0
-
-            let amountOut =
-                if event.Amount1 < 0I then
-                    event.Amount1 * (-1I)
-                else
-                    event.Amount1
+            let getAmount amount = 
+                if amount < 0I then amount * (-1I) else amount
+            
+            let amountIn = getAmount event.Amount0
+            let amountOut = getAmount event.Amount1
 
             if func :? ExactOutputFunction then
                 let decodedInput =
@@ -588,17 +585,103 @@ module Logic =
         let routerAddress = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
 
         let private swapExactTokensForTokensId = "0x38ed1739"
-        let private swapTokensForExactTokens = "0x8803dbee"
-        let private swapExactETHForTokens = "0x7ff36ab5"
-        let private swapTokensForExactETH = "0x4a25d94a"
-        let private swapExactTokensForETH = "0x18cbafe5"
-        let private swapETHForExactTokens = "0xfb3bdb41"
-        let private swapExactTokensForTokensSupportingFeeOnTransferTokens = "0x5c11d795"
-        let private swapExactETHForTokensSupportingFeeOnTransferTokens = "0xb6f9de95"
-        let private swapExactTokensForETHSupportingFeeOnTransferTokens = "0x791ac947"
+        let private swapTokensForExactTokensId = "0x8803dbee"
+        let private swapExactETHForTokensId = "0x7ff36ab5"
+        let private swapTokensForExactETHId = "0x4a25d94a"
+        let private swapExactTokensForETHId = "0x18cbafe5"
+        let private swapETHForExactTokensId = "0xfb3bdb41"
+        let private swapExactTokensForTokensSupportingFeeOnTransferTokensId = "0x5c11d795"
+        let private swapExactETHForTokensSupportingFeeOnTransferTokensId = "0xb6f9de95"
+        let private swapExactTokensForETHSupportingFeeOnTransferTokensId = "0x791ac947"
+
+        [<Event("Swap")>]
+        type private SwapEventDTO() =
+            inherit EventDTO()
+
+            [<Parameter("address", "sender", 1, true)>]
+            member val Sender = Unchecked.defaultof<string> with get, set
+
+            [<Parameter("uint", "amount0In", 2, false)>]
+            member val Amount0In = Unchecked.defaultof<BigInteger> with get, set
+
+            [<Parameter("uint", "amount1In", 3, false)>]
+            member val Amount1In = Unchecked.defaultof<BigInteger> with get, set
+
+            [<Parameter("uint", "amount0Out", 4, false)>]
+            member val Amount0Out = Unchecked.defaultof<BigInteger> with get, set
+
+            [<Parameter("uint", "amount1Out", 5, false)>]
+            member val Amount1Out = Unchecked.defaultof<BigInteger> with get, set
+
+            [<Parameter("address", "to", 6, true)>]
+            member val To = Unchecked.defaultof<string> with get, set
+
+        let private getTokensAndAmountsFromRouter (func: FunctionMessage) (event: SwapEventDTO) transactionInput = 
+            let getAmount amount0 amount1 =
+                if amount0 = 0I then amount1 else amount0
+
+            let amountIn = getAmount event.Amount0In event.Amount1In
+            let amountOut = getAmount event.Amount0Out event.Amount1Out
+
+            if func :? SwapExactTokensForTokensFunction
+            then let decoded = (new SwapExactTokensForTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapTokensForExactTokensFunction
+            then let decoded = (new SwapTokensForExactTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapExactETHForTokensFunction
+            then let decoded = (new SwapExactETHForTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapTokensForExactETHFunction
+            then let decoded = (new SwapTokensForExactETHFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapExactTokensForETHFunction
+            then let decoded = (new SwapExactTokensForETHFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapETHForExactTokensFunction
+            then let decoded = (new SwapETHForExactTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapExactTokensForTokensSupportingFeeOnTransferTokensFunction
+            then let decoded = (new SwapExactTokensForTokensSupportingFeeOnTransferTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapExactETHForTokensSupportingFeeOnTransferTokensFunction
+            then let decoded = (new SwapExactETHForTokensSupportingFeeOnTransferTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else if func :? SwapExactTokensForETHSupportingFeeOnTransferTokensFunction
+            then let decoded = (new SwapExactTokensForETHSupportingFeeOnTransferTokensFunction()).DecodeInput(transactionInput)
+                 (decoded.Path.First(), decoded.Path.Last(), amountIn, amountOut)
+            else ("", "", 0I, 0I)
 
         let getInfoFromRouter (transaction: Transaction) (transactionReceipt: TransactionReceipt) =
-            ("", "", 0I, 0I)
+            if transaction.Input.Contains(swapExactTokensForTokensId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapExactTokensForTokensFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapTokensForExactTokensId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapTokensForExactTokensFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapExactETHForTokensId)
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapExactETHForTokensFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapTokensForExactETHId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapTokensForExactETHFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapExactTokensForETHId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapExactTokensForETHFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapETHForExactTokensId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapETHForExactTokensFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapExactTokensForTokensSupportingFeeOnTransferTokensId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapExactTokensForTokensSupportingFeeOnTransferTokensFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapExactETHForTokensSupportingFeeOnTransferTokensId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapExactETHForTokensSupportingFeeOnTransferTokensFunction()) event transaction.Input
+            else if transaction.Input.Contains(swapExactTokensForETHSupportingFeeOnTransferTokensId) 
+            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
+                 getTokensAndAmountsFromRouter (new SwapExactTokensForETHSupportingFeeOnTransferTokensFunction()) event transaction.Input
+            else ("", "", 0I, 0I)
+
 
     let partlyBuildCandle
         (transactionsWithReceipts: Tuple<Transaction, TransactionReceipt> [])

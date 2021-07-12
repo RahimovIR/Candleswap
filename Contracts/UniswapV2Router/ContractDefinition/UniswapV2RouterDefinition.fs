@@ -32,14 +32,6 @@ open System.Threading
         inherit FunctionMessage()
     
     [<FunctionOutput>]
-    type RemoveLiquidityOutputDTO() =
-        inherit FunctionOutputDTO() 
-            [<Parameter("uint256", "amountA", 1)>]
-            member val public AmountA = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "amountB", 2)>]
-            member val public AmountB = Unchecked.defaultof<BigInteger> with get, set
-
-    [<FunctionOutput>]
     type AddLiquidityOutputDTO() =
         inherit FunctionOutputDTO() 
             [<Parameter("uint256", "amountA", 1)>]
@@ -48,43 +40,6 @@ open System.Threading
             member val public AmountB = Unchecked.defaultof<BigInteger> with get, set
             [<Parameter("uint256", "liquidity", 3)>]
             member val public Liquidity = Unchecked.defaultof<BigInteger> with get, set
-
-    [<FunctionOutput>]
-    type AddLiquidityETHOutputDTO() =
-        inherit FunctionOutputDTO() 
-            [<Parameter("uint256", "amountToken", 1)>]
-            member val public AmountToken = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "amountETH", 2)>]
-            member val public AmountETH = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "liquidity", 3)>]
-            member val public Liquidity = Unchecked.defaultof<BigInteger> with get, set
-
-    [<FunctionOutput>]
-    type RemoveLiquidityETHOutputDTO() =
-        inherit FunctionOutputDTO() 
-            [<Parameter("uint256", "amountToken", 1)>]
-            member val public AmountToken = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "amountETH", 2)>]
-            member val public AmountETH = Unchecked.defaultof<BigInteger> with get, set
-
-    [<FunctionOutput>]
-    type RemoveLiquidityETHWithPermitOutputDTO() =
-        inherit FunctionOutputDTO() 
-            [<Parameter("uint256", "amountToken", 1)>]
-            member val public AmountToken = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "amountETH", 2)>]
-            member val public AmountETH = Unchecked.defaultof<BigInteger> with get, set
-        
-    
-    
-    
-    [<FunctionOutput>]
-    type RemoveLiquidityWithPermitOutputDTO() =
-        inherit FunctionOutputDTO() 
-            [<Parameter("uint256", "amountA", 1)>]
-            member val public AmountA = Unchecked.defaultof<BigInteger> with get, set
-            [<Parameter("uint256", "amountB", 2)>]
-            member val public AmountB = Unchecked.defaultof<BigInteger> with get, set
         
     
     [<Function("addLiquidity", typeof<AddLiquidityOutputDTO>)>]
@@ -107,6 +62,16 @@ open System.Threading
             member val public To = Unchecked.defaultof<string> with get, set
             [<Parameter("uint256", "deadline", 8)>]
             member val public Deadline = Unchecked.defaultof<BigInteger> with get, set
+
+    [<FunctionOutput>]
+    type AddLiquidityETHOutputDTO() =
+        inherit FunctionOutputDTO() 
+            [<Parameter("uint256", "amountToken", 1)>]
+            member val public AmountToken = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "amountETH", 2)>]
+            member val public AmountETH = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "liquidity", 3)>]
+            member val public Liquidity = Unchecked.defaultof<BigInteger> with get, set
         
     
     [<Function("addLiquidityETH", typeof<AddLiquidityETHOutputDTO>)>]
@@ -125,6 +90,38 @@ open System.Threading
             member val public To = Unchecked.defaultof<string> with get, set
             [<Parameter("uint256", "deadline", 6)>]
             member val public Deadline = Unchecked.defaultof<BigInteger> with get, set
+
+    [<FunctionOutput>]
+    type RemoveLiquidityETHOutputDTO() =
+        inherit FunctionOutputDTO() 
+            [<Parameter("uint256", "amountToken", 1)>]
+            member val public AmountToken = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "amountETH", 2)>]
+            member val public AmountETH = Unchecked.defaultof<BigInteger> with get, set
+
+    [<FunctionOutput>]
+    type RemoveLiquidityOutputDTO() =
+        inherit FunctionOutputDTO() 
+            [<Parameter("uint256", "amountA", 1)>]
+            member val public AmountA = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "amountB", 2)>]
+            member val public AmountB = Unchecked.defaultof<BigInteger> with get, set
+
+    [<FunctionOutput>]
+    type RemoveLiquidityETHWithPermitOutputDTO() =
+        inherit FunctionOutputDTO() 
+            [<Parameter("uint256", "amountToken", 1)>]
+            member val public AmountToken = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "amountETH", 2)>]
+            member val public AmountETH = Unchecked.defaultof<BigInteger> with get, set
+
+    [<FunctionOutput>]
+    type RemoveLiquidityWithPermitOutputDTO() =
+        inherit FunctionOutputDTO() 
+            [<Parameter("uint256", "amountA", 1)>]
+            member val public AmountA = Unchecked.defaultof<BigInteger> with get, set
+            [<Parameter("uint256", "amountB", 2)>]
+            member val public AmountB = Unchecked.defaultof<BigInteger> with get, set
         
     
     [<Function("factory", "address")>]
@@ -470,6 +467,7 @@ open System.Threading
             [<Parameter("address", "", 1)>]
             member val public ReturnValue1 = Unchecked.defaultof<string> with get, set
         
+        
     
     [<FunctionOutput>]
     type FactoryOutputDTO() =
@@ -510,9 +508,8 @@ open System.Threading
     type QuoteOutputDTO() =
         inherit FunctionOutputDTO() 
             [<Parameter("uint256", "amountB", 1)>]
-            member val public AmountB = Unchecked.defaultof<BigInteger> with get, set
+            member val public AmountB = Unchecked.defaultof<BigInteger> with get, set   
         
-    
         
     
     

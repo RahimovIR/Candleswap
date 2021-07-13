@@ -12,7 +12,7 @@ namespace UniswapView.Data
 {
     public class CandlesService
     {
-        public async Task<FSharpBack.DBCandle[]> GetCandlesAsync(string symbol, int periodSeconds, 
+        public string CreateGetCandlesUri(string symbol, int periodSeconds, 
             long? startTime = default, long? endTime = default, int? limit = default)
         {
             var client = new HttpClient();
@@ -33,16 +33,8 @@ namespace UniswapView.Data
             {
                 queryParams.Add("limit", limit.ToString());
             }
-            var request = new HttpRequestMessage()
-            {
-                Method = HttpMethod.Get,
-                RequestUri = new Uri("https://localhost:5001/api/candles" + ToQueryString(queryParams)),
-            };
 
-            var response = await client.SendAsync(request);
-            var responseToken = await response.Content.ReadAsStreamAsync();
-            return await JsonSerializer.DeserializeAsync(responseToken, typeof(FSharpBack.DBCandle[])) 
-                as FSharpBack.DBCandle[];
+            return "https://localhost:5001/api/candles" + ToQueryString(queryParams);
         }
 
         private string ToQueryString(NameValueCollection nvc)

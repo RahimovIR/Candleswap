@@ -8,6 +8,7 @@
         }
     }
     const domElement = document.getElementById("chart_div");
+    domElement.innerHTML = "";
     const chart = LightweightCharts.createChart(domElement, chartProperties);
     const candleSeries = chart.addCandlestickSeries();
 
@@ -22,7 +23,7 @@
                     high: parseFloat(d['high']),
                     low: parseFloat(d['low'])
                 }
-            }).reverse()
+            }).reverse() //timestamps come in desc order, but TradingView requires them in asc
             console.log(cdata);
             candleSeries.setData(cdata);
         })

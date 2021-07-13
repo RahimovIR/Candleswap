@@ -4,15 +4,69 @@
 @inject CandlesService candlesService
 @inject IJSRuntime jsRuntime
 
-<h1>Uniswap candles</h1>
+@code {
+    private string PairID { get; set; } = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8";
+    private int Interval { get; set; } = 300;
+    private int Limit { get; set; } = 10;
+    private DateTime StartTime { get; set; } = DateTime.Now - TimeSpan.FromDays(30);
+    private DateTime EndTime { get; set; } = DateTime.Now;
+}
 
+<h1>Uniswap candles</h1>
+<form class="mb-3 row">
+    <div class="col-auto">
+        <label for="symbolInput" class="visually-hidden">Pair ID*</label>
+        <input type="text"
+               class="form-control-plaintext"
+               id="symbolInput"
+               @bind="@PairID"/>
+    </div>
+    <div class="col-auto">
+        <label for="periodInput" class="visually-hidden">Interval*</label>
+        <input type="number"
+               class="form-control-plaintext"
+               id="periodInput"
+               @bind="@Interval" />
+    </div>
+    <div class="col-auto">
+        <label for="limitInput" class="visually-hidden">Limit</label>
+        <input type="number"
+               class="form-control-plaintext"
+               id="periodInput"
+               @bind="@Limit" />
+    </div>
+    <div class="col-auto">
+        <label for="startTimeInput" class="visually-hidden">Start time</label>
+        <input type="datetime-local"
+               class="form-control-plaintext"
+               id="startTimeInput"
+               @bind="@StartTime"/>
+    </div>
+    <div class="col-auto">
+        <label for="endTimeInput" class="visually-hidden">End time</label>
+        <input type="datetime-local"
+               class="form-control-plaintext"
+               id="endTimeInput"
+               @bind="@EndTime"/>
+    </div>
+    <div class="col-auto">
+        <button type="button"
+                class="btn btn-primary mb-3"
+                @onclick="async () => await DrawChart()">
+            Draw chart
+        </button>
+    </div>
+</form>
 <div id="chart_div" style="height: 400px"></div>
 
-@code { 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+@functions {
+    async Task DrawChart()
     {
-        await jsRuntime.InvokeVoidAsync("drawChart",
-            "https://localhost:5001/api/Candles?symbol=0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8" +
-            "&periodSeconds=300&limit=1000");
+        await jsRuntime.InvokeVoidAsync("drawChart", candlesService.CreateGetCandlesUri(
+            PairID, 
+            Interval, 
+            new DateTimeOffset(StartTime).ToUnixTimeSeconds(),
+            new DateTimeOffset(EndTime).ToUnixTimeSeconds(),
+            Limit));
     }
 }

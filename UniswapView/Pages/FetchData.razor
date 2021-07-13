@@ -1,57 +1,18 @@
 ﻿@page "/fetchdata"
 
-@using UniswapView.Data 
-@using System.Globalization
+@using UniswapView.Data
 @inject CandlesService candlesService
 @inject IJSRuntime jsRuntime
 
-<h1>Weather forecast</h1>
-
-<p>This component demonstrates fetching data from a service.</p>
-
-@if (candles == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>High</th>
-                <th>Low</th>
-                <th>Open</th>
-                <th>Close</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var candle in candles)
-            {
-                <tr>
-                    <td>@candle.high</td>
-                    <td>@candle.low</td>
-                    <td>@candle._open</td>
-                    <td>@candle.close</td>
-                    <td>@candle.datetime</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<h1>Uniswap candles</h1>
 
 <div id="chart_div" style="height: 400px"></div>
 
-@code {
-    private FSharpBack.DBCandle[] candles;
-
-    protected override async Task OnInitializedAsync()
+@code { 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        candles = await candlesService.GetCandlesAsync("0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc", 1800);
-        //jsRuntime.InvokeVoidAsync("drawChart", candles.Select(c => new decimal[] { 
-        //    decimal.Parse(c.low, CultureInfo.InvariantCulture),
-        //    decimal.Parse(c.high, CultureInfo.InvariantCulture), 
-        //    decimal.Parse(c._open, CultureInfo.InvariantCulture), 
-        //    decimal.Parse(c.close, CultureInfo.InvariantCulture) }).ToArray());
+        await jsRuntime.InvokeVoidAsync("drawChart",
+            "https://localhost:5001/api/Candles?symbol=0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8" +
+            "&periodSeconds=300&limit=1000");
     }
 }

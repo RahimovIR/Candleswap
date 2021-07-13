@@ -12,6 +12,7 @@ namespace WebSocket.Uniswap
 {
     public class Startup
     {
+        const string CorsAllowCrossOrigins = "access-control-allow-origin";
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -32,6 +33,16 @@ namespace WebSocket.Uniswap
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebSocket.Uniswap", Version = "v1" });
             });
 
+            services.AddCors(options =>
+            {
+                options.AddPolicy(CorsAllowCrossOrigins,
+                    builder =>
+                    {
+                        builder.WithOrigins("*")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                    });
+            });
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -56,6 +67,8 @@ namespace WebSocket.Uniswap
             app.UseHttpsRedirection();
 
             app.UseRouting();
+
+            app.UseCors(CorsAllowCrossOrigins);
 
             app.UseAuthorization();
 

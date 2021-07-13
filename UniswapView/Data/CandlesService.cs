@@ -12,11 +12,6 @@ namespace UniswapView.Data
 {
     public class CandlesService
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
         public async Task<FSharpBack.DBCandle[]> GetCandlesAsync(string symbol, int periodSeconds, 
             long? startTime = default, long? endTime = default, int? limit = default)
         {

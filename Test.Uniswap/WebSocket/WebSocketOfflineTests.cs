@@ -161,7 +161,7 @@ namespace Test.Uniswap
                     + To32ByteWord(swapExactParams.Path);
                 input += addParams.Replace("0x", string.Empty);
 
-                var transaction = new Transaction() { Input = input, To = SwapRouterV2.routerAddress };
+                var transaction = new Transaction() { Input = input, To = SwapRouterV2.router02Address };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
             var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),

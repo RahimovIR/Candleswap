@@ -1,11 +1,10 @@
 ﻿namespace RedDuck.Candleswap.Candles
 
 open System
-open System.Numerics
 open FSharp.Data.GraphQL
 open Newtonsoft.Json.Linq
 
-module Requests =
+module internal Requests =
     let swapsQuery id =
         $"""query q {{
                swaps(orderBy: timestamp, orderDirection: desc,
@@ -59,22 +58,6 @@ module Requests =
               OperationName = Some "q" }
 
         GraphQLClient.sendRequest connection request
-
-    type Swap =
-        { id: string
-          amount0In: float
-          amount0Out: float
-          amount1In: float
-          amount1Out: float
-          timestamp: int64 }
-
-    type PairInfo =
-        { reserve0: BigInteger
-          reserve1: BigInteger
-          price0: float
-          price1: float
-          token0Id: string
-          token1Id: string }
 
     type PoolInfo = { token0Id: string; token1Id: string }
 

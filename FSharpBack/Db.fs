@@ -3,16 +3,12 @@
 open System.Data.SQLite
 open System.Collections.Generic
 open Dapper
-
 open RedDuck.Candleswap.Candles.Types
 
-module Db =
+module internal Db =
+    let private databaseFilename = __SOURCE_DIRECTORY__ + @"\Database\candles.db"
 
-    let private databaseFilename =
-        __SOURCE_DIRECTORY__ + @"\Database\candles.db"
-
-    let private connectionString =
-        sprintf "Data Source=%s;Version=3;" databaseFilename
+    let private connectionString = sprintf "Data Source=%s;Version=3;" databaseFilename
 
     let private connection = new SQLiteConnection(connectionString)
     do connection.Open()
@@ -46,7 +42,7 @@ module Db =
         async {
             let! candles =
                 Async.AwaitTask
-                <| dbQuery<DBCandle>
+                <| dbQuery<DbCandle>
                     connection
                     fetchCandlesSql
                     (Some(
@@ -56,7 +52,6 @@ module Db =
 
             return candles
         }
-
 
     let fetchCandlesTask (uniswapPairId: string) (resolutionSeconds: int) =
         Async.StartAsTask

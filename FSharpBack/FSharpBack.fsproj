@@ -14,7 +14,7 @@
     <PackageReference Include="FSharp.Data.GraphQL.Client" Version="1.0.7" />
     <PackageReference Include="Nethereum.ABI" Version="3.8.0" />
     <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="SolidityProvider" Version="1.0.9" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.114.4" />
     <ProjectReference Include="..\Contracts\Contracts.fsproj" />
 	<PackageReference Update="FSharp.Core" Version="5.0.1" />

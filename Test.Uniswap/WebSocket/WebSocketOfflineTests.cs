@@ -17,6 +17,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using static FSharpBack.Logic.SwapRouterV3;
 using static FSharpBack.Logic;
+using Nethereum.ABI.FunctionEncoding.Attributes;
+using Contracts.UniswapV1Exchange.ContractDefinition;
 
 namespace Test.Uniswap
 {
@@ -161,7 +163,85 @@ namespace Test.Uniswap
                     + To32ByteWord(swapExactParams.Path);
                 input += addParams.Replace("0x", string.Empty);
 
-                var transaction = new Transaction() { Input = input, To = SwapRouterV2.routerAddress };
+                var transaction = new Transaction() { Input = input, To = SwapRouterV2.router02Address };
+                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+            }
+            var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
+                // substring from 26th element due to tokens being decoded in 16 bytes, not 32
+                tokenIn[26..].Insert(0, "0x"),
+                tokenOut[26..].Insert(0, "0x"),
+                new FSharpBack.Candle(_open: 0, high: 0,
+                    low: BigDecimal.Parse(maxUInt256StringRepresentation),
+                    close: 0, volume: 0),
+                wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
+            var cancelBuildCandle = new CancellationTokenSource();
+            FSharpBack.Candle candle = (await FSharpAsync.StartAsTask(computation,
+                            new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
+                            new FSharpOption<CancellationToken>(cancelBuildCandle.Token))).Item1;
+            Console.WriteLine(candle);
+            Assert.IsNotNull(candle);
+            Assert.IsTrue(candle._open != 0);
+            Assert.IsTrue(candle.high != 0);
+            Assert.IsTrue(candle.low != 0);
+            Assert.IsTrue(candle.close != 0);
+            Assert.IsTrue(candle.volume != 0);
+        }
+
+        [TestMethod]
+        [DataRow(1, 1)]
+        public async Task GetV1Candles_Offline(int tuplesCount, int swapsCount)
+        {
+            var rnd = new Random();
+            string configJson;
+            using (var reader = new StreamReader(@"../../../WebSocket/offlineMockParamsV1Router.json"))
+            {
+                configJson = reader.ReadToEnd();
+            }
+            List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts = new();
+
+            var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
+            var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
+            for (var i = 0; i < tuplesCount; i++)
+            {
+                var swapEvents = new List<TransferEventDTO>();
+                for (int j = 0; j < swapsCount; j++)
+                {
+                    swapEvents.AddRange(GenerateV1TransferEvents(rnd, tokenIn, tokenOut));
+                }
+
+                var swapEventsTokens = new List<JToken>();
+                foreach (var swapEvent in swapEvents)
+                {
+                    var transferJson = JObject.Parse(configJson);
+                    transferJson["data"] = To32ByteWord(swapEvent.Value);
+                    transferJson["topics"] = new JArray()
+                    {
+                        transferJson["signature"],
+                        swapEvent.From,
+                        swapEvent.To
+                    };
+                    transferJson.Remove("signature");
+                    swapEventsTokens.Add(transferJson);
+                }
+                var receipt = new TransactionReceipt { Logs = JArray.FromObject(swapEventsTokens) };
+                var swapExactParams = new TokenToTokenSwapOutputFunction()
+                {
+                    Tokens_bought = rnd.Next(1, 100000),
+                    Max_tokens_sold = rnd.Next(1, 100000),
+                    Max_eth_sold = rnd.Next(1, 100000),
+                    Deadline = rnd.Next(1, 100000),
+                    Token_addr = To32ByteWord(rnd.Next(1, 100000)).ToLowerInvariant()
+                };
+
+                var input = ExchangeV1.tokenToTokenSwapOutputId;
+                var addParams = To32ByteWord(swapExactParams.Tokens_bought)
+                    + To32ByteWord(swapExactParams.Max_tokens_sold)
+                    + To32ByteWord(swapExactParams.Max_eth_sold)
+                    + To32ByteWord(swapExactParams.Deadline)
+                    + swapExactParams.Token_addr;
+                input += addParams.Replace("0x", string.Empty);
+
+                var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
             var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
@@ -220,6 +300,25 @@ namespace Test.Uniswap
                     return resStr;
             }
             return To32ByteWord(item.ToString());
+        }
+
+        private TransferEventDTO[] GenerateV1TransferEvents(Random rnd, string tokenIn, string tokenOut)
+        {
+            return new[]
+            {
+                new TransferEventDTO
+                {
+                    From = tokenIn,
+                    To = To32ByteWord(rnd.Next(1, 1000)).ToLowerInvariant(),
+                    Value = rnd.Next(1, 1000)
+                },
+                new TransferEventDTO
+                {
+                    From = tokenOut,
+                    To = To32ByteWord(rnd.Next(1, 1000)).ToLowerInvariant(),
+                    Value = rnd.Next(1, 1000)
+                }
+            };
         }
 
         private SwapRouterV2.SwapEventDTO GenerateV2SwapEvent(Random rnd)

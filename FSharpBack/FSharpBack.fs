@@ -16,6 +16,7 @@ open Nethereum.Hex.HexConvertors.Extensions
 open Nethereum.Contracts
 open Contracts.UniswapV3Router.ContractDefinition
 open Contracts.UniswapV2Router.ContractDefinition
+open Contracts.UniswapV1Exchange.ContractDefinition
 open Nethereum.Util
 open System.Linq
 
@@ -547,42 +548,40 @@ module Logic =
             "0x" + multicall.Substring(index, length)
 
         let getInfoFromRouter (transaction: Transaction) (transactionReceipt: TransactionReceipt) =
-            let event =
-                transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0]
-                    .Event
-
+            let swapEvents = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>()
             if transaction.Input.StartsWith(multicallId) then
                 if transaction.Input.Contains(exactInputId.Replace("0x", "")) then
                     transaction.Input.IndexOf(exactInputId.Replace("0x", ""))
                     |> multicallToCall transaction.Input lengthForSimpleCall
-                    |> getSimpleInfoFromRouter (new ExactInputFunction()) event
+                    |> getSimpleInfoFromRouter (new ExactInputFunction())swapEvents.[0].Event
                 else if transaction.Input.Contains(exactOutputId.Replace("0x", "")) then
                     transaction.Input.IndexOf(exactOutputId.Replace("0x", ""))
                     |> multicallToCall transaction.Input lengthForSimpleCall
-                    |> getSimpleInfoFromRouter (new ExactOutputFunction()) event
+                    |> getSimpleInfoFromRouter (new ExactOutputFunction()) swapEvents.[0].Event
                 else if transaction.Input.Contains(exactInputSingleId) then
                     transaction.Input.IndexOf(exactInputSingleId.Replace("0x", ""))
                     |> multicallToCall transaction.Input lengthForSingleCall
-                    |> getSingleInfoFromRouter (new ExactInputSingleFunction()) event
+                    |> getSingleInfoFromRouter (new ExactInputSingleFunction()) swapEvents.[0].Event
                 else if transaction.Input.Contains(exactOutputSingleId.Replace("0x", "")) then
                     transaction.Input.IndexOf(exactOutputSingleId.Replace("0x", ""))
                     |> multicallToCall transaction.Input lengthForSingleCall
-                    |> getSingleInfoFromRouter (new ExactOutputSingleFunction()) event
+                    |> getSingleInfoFromRouter (new ExactOutputSingleFunction()) swapEvents.[0].Event
                 else
                     ("", "", 0I, 0I)
             else if transaction.Input.Contains(exactInputId) then
-                getSimpleInfoFromRouter (new ExactInputFunction()) event transaction.Input
+                getSimpleInfoFromRouter (new ExactInputFunction()) swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(exactOutputId) then
-                getSimpleInfoFromRouter (new ExactOutputFunction()) event transaction.Input
+                getSimpleInfoFromRouter (new ExactOutputFunction()) swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(exactInputSingleId) then
-                getSingleInfoFromRouter (new ExactInputSingleFunction()) event transaction.Input
+                getSingleInfoFromRouter (new ExactInputSingleFunction()) swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(exactOutputSingleId) then
-                getSingleInfoFromRouter (new ExactOutputSingleFunction()) event transaction.Input
+                getSingleInfoFromRouter (new ExactOutputSingleFunction()) swapEvents.[0].Event transaction.Input
             else
                 ("", "", 0I, 0I)
 
     module SwapRouterV2 =
-        let routerAddress = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        let router01Address = "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a"
+        let router02Address = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
 
         let swapExactTokensForTokensId = "0x38ed1739"
         let swapTokensForExactTokensId = "0x8803dbee"
@@ -653,35 +652,123 @@ module Logic =
             else ("", "", 0I, 0I)
 
         let getInfoFromRouter (transaction: Transaction) (transactionReceipt: TransactionReceipt) =
+            let swapEvents = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>()
             if transaction.Input.Contains(swapExactTokensForTokensId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapExactTokensForTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapExactTokensForTokensFunction()) swapEvents.[0].Event 
+                                                                                        transaction.Input
             else if transaction.Input.Contains(swapTokensForExactTokensId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapTokensForExactTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapTokensForExactTokensFunction()) swapEvents.[0].Event  
+                                                                                        transaction.Input
             else if transaction.Input.Contains(swapExactETHForTokensId)
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapExactETHForTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapExactETHForTokensFunction())swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(swapTokensForExactETHId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapTokensForExactETHFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapTokensForExactETHFunction()) swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(swapExactTokensForETHId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapExactTokensForETHFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapExactTokensForETHFunction()) swapEvents.[0].Event  transaction.Input
             else if transaction.Input.Contains(swapETHForExactTokensId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapETHForExactTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapETHForExactTokensFunction()) swapEvents.[0].Event  transaction.Input
             else if transaction.Input.Contains(swapExactTokensForTokensSupportingFeeOnTransferTokensId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapExactTokensForTokensSupportingFeeOnTransferTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapExactTokensForTokensSupportingFeeOnTransferTokensFunction()) 
+                                               swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(swapExactETHForTokensSupportingFeeOnTransferTokensId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapExactETHForTokensSupportingFeeOnTransferTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapExactETHForTokensSupportingFeeOnTransferTokensFunction()) 
+                                               swapEvents.[0].Event transaction.Input
             else if transaction.Input.Contains(swapExactTokensForETHSupportingFeeOnTransferTokensId) 
-            then let event = transactionReceipt.Logs.DecodeAllEvents<SwapEventDTO>().[0].Event
-                 getTokensAndAmountsFromRouter (new SwapExactTokensForETHSupportingFeeOnTransferTokensFunction()) event transaction.Input
+            then getTokensAndAmountsFromRouter (new SwapExactTokensForETHSupportingFeeOnTransferTokensFunction())
+                                               swapEvents.[0].Event transaction.Input
             else ("", "", 0I, 0I)
 
+    module ExchangeV1 =
+        let exchangeAddress = "0x09cabec1ead1c0ba254b09efb3ee13841712be14"
+        let wethAddress = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+
+        let ethToTokenSwapInputId = "0xf39b5b9b"
+        let ethToTokenTransferInputId = "0xad65d76d"
+        let ethToTokenSwapOutputId = "0x6b1d4db7"
+        let ethToTokenTransferOutputId = "0x0b573638"
+
+        let tokenToEthSwapInputId = "0x95e3c50b"
+        let tokenToEthTransferInputId = "0x7237e031"
+        let tokenToEthSwapOutputId = "0x013efd8b"
+        let tokenToEthTransferOutputId = "0xd4e4841d"
+
+        let tokenToTokenSwapInputId = "0xddf7e1a7"
+        let tokenToTokenTransferInputId = "0xf552d91b"
+        let tokenToTokenSwapOutputId = "0xb040d545"
+        let tokenToTokenTransferOutputId = "0xf3c0efe9"
+
+        let tokenToExchangeSwapInputId = "0xb1cb43bf"
+        let tokenToExchangeTransferInputId = "0xec384a3e"
+        let tokenToExchangeSwapOutputId = "0xea650c7d"
+        let tokenToExchangeTransferOutputId = "0x981a1327"
+
+
+        [<Event("TokenPurchase")>]
+        type TokenPurchaseEventDTO() =
+            inherit EventDTO()
+
+            [<Parameter("address", "buyer", 1, true)>]
+            member val Buyer = Unchecked.defaultof<string> with get, set
+
+            [<Parameter("uint256", "eth_sold", 2, true)>]
+            member val EthSold = Unchecked.defaultof<BigInteger> with get, set
+
+            [<Parameter("uint256", "tokens_bought", 3, true)>]
+            member val TokensBought = Unchecked.defaultof<BigInteger> with get, set
+
+
+        [<Event("EthPurchase")>]
+        type EthPurchaseEventDTO() =
+            inherit EventDTO()
+
+            [<Parameter("address", "buyer", 1, true)>]
+            member val Buyer = Unchecked.defaultof<string> with get, set
+
+            [<Parameter("uint256", "tokens_sold", 2, true)>]
+            member val TokensSold = Unchecked.defaultof<BigInteger> with get, set
+
+            [<Parameter("uint256", "eth_bought", 3, true)>]
+            member val EthBought = Unchecked.defaultof<BigInteger> with get, set
+
+
+        let getInfoFromEthToToken (tokenPurchaseEvent: TokenPurchaseEventDTO) = 
+            let tokenIn = wethAddress
+            let tokenOut = tokenPurchaseEvent.Buyer 
+            let amountIn = tokenPurchaseEvent.EthSold
+            let amountOut = tokenPurchaseEvent.TokensBought
+            (tokenIn, tokenOut, amountIn, amountOut)
+
+        let getInfoFromTokenToEth (ethPurchaseEvent: EthPurchaseEventDTO) = 
+            let tokenIn = ethPurchaseEvent.Buyer
+            let tokenOut = wethAddress
+            let amountIn = ethPurchaseEvent.TokensSold
+            let amountOut = ethPurchaseEvent.EthBought
+            (tokenIn, tokenOut, amountIn, amountOut)
+
+        let getInfoFromTokenToToken (firstTransferEvent:TransferEventDTO) (secondTransferEvent:TransferEventDTO)=
+            let tokenIn = firstTransferEvent.From
+            let tokenOut = secondTransferEvent.From
+            let amountIn = firstTransferEvent.Value
+            let amountOut = secondTransferEvent.Value
+            (tokenIn, tokenOut, amountIn, amountOut)
+        
+
+        let getInfoFromExchange (transaction: Transaction) (transactionReceipt: TransactionReceipt) =
+            let transferEvents = transactionReceipt.Logs.DecodeAllEvents<TransferEventDTO>()
+            let tokenPurchaseEvents = transactionReceipt.Logs.DecodeAllEvents<TokenPurchaseEventDTO>()
+            let ethPurchaseEvents = transactionReceipt.Logs.DecodeAllEvents<EthPurchaseEventDTO>()
+            if transaction.Input.Contains(ethToTokenSwapInputId) || transaction.Input.Contains(ethToTokenTransferInputId)
+               || transaction.Input.Contains(ethToTokenSwapOutputId) || transaction.Input.Contains(ethToTokenTransferOutputId)
+            then getInfoFromEthToToken tokenPurchaseEvents.[0].Event
+            else if transaction.Input.Contains(tokenToEthSwapInputId) || transaction.Input.Contains(tokenToEthTransferInputId)
+                    || transaction.Input.Contains(tokenToEthSwapOutputId) || transaction.Input.Contains(tokenToEthTransferOutputId)
+            then getInfoFromTokenToEth ethPurchaseEvents.[0].Event
+            else if transaction.Input.Contains(tokenToTokenSwapInputId) || transaction.Input.Contains(tokenToTokenTransferInputId)
+                    || transaction.Input.Contains(tokenToTokenSwapOutputId) || transaction.Input.Contains(tokenToTokenTransferOutputId)
+                    || transaction.Input.Contains(tokenToExchangeSwapInputId) || transaction.Input.Contains(tokenToExchangeTransferInputId)
+                    || transaction.Input.Contains(tokenToExchangeSwapOutputId) || transaction.Input.Contains(tokenToExchangeTransferOutputId)
+            then getInfoFromTokenToToken transferEvents.[0].Event transferEvents.[1].Event
+            else ("", "", 0I, 0I)
 
     let partlyBuildCandle
         (transactionsWithReceipts: Tuple<Transaction, TransactionReceipt> [])
@@ -702,10 +789,13 @@ module Logic =
 
             for transactionWithReceipt in transactionsWithReceipts do
                 let (transaction, receipt) = transactionWithReceipt
-                let (tokenInAddress, tokenOutAddress, amountIn, amountOut) = if transaction.To = SwapRouterV3.routerAddress then
-                                                                                 SwapRouterV3.getInfoFromRouter transaction receipt
-                                                                             else if transaction.To = SwapRouterV2.routerAddress then 
-                                                                                 SwapRouterV2.getInfoFromRouter transaction receipt
+                let (tokenInAddress, tokenOutAddress, amountIn, amountOut) = if transaction.To = SwapRouterV3.routerAddress 
+                                                                             then SwapRouterV3.getInfoFromRouter transaction receipt
+                                                                             else if transaction.To = SwapRouterV2.router02Address ||
+                                                                                     transaction.To = SwapRouterV2.router01Address
+                                                                             then SwapRouterV2.getInfoFromRouter transaction receipt
+                                                                             else if transaction.To = ExchangeV1.exchangeAddress
+                                                                             then ExchangeV1.getInfoFromExchange transaction receipt
                                                                              else ("", "", 0I, 0I)
 
                 if token0Id = tokenInAddress
@@ -750,8 +840,10 @@ module Logic =
             transactions
             |> Array.filter
                 (fun transaction ->
-                    (transaction.To = SwapRouterV3.routerAddress
-                    || transaction.To = SwapRouterV2.routerAddress)
+                    (transaction.To = SwapRouterV3.routerAddress 
+                    || transaction.To = SwapRouterV2.router01Address
+                    || transaction.To = SwapRouterV2.router02Address
+                    || transaction.To = ExchangeV1.exchangeAddress)
                     && transaction.Input <> "0x")
 
         let filterSuccessfulTranscations (transactionsWithReceipts: Tuple<Transaction, TransactionReceipt> []) =
@@ -765,20 +857,16 @@ module Logic =
             let pair = Requests.takePoolInfo(pairId).Value
             let token0Id = pair.token0Id
             let token1Id = pair.token1Id
+            //try
+            let! initializableBlockNumber = currentTime.ToUnixTimeSeconds()
+                                            |> BigInteger
+                                            |> Dater.getBlockByDateAsync false web3
+            let mutable blockNumber = initializableBlockNumber.number.Value
 
-            let mutable blockNumber =
-                (currentTime.ToUnixTimeSeconds()
-                 |> BigInteger
-                 |> Dater.getBlockByDateAsync false web3 //IfBlockAfterDate
-                 |> Async.RunSynchronously)
-                    .number
-                    .Value
-
-            let mutable block =
-                HexBigInteger blockNumber
-                |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
-                |> Async.AwaitTask
-                |> Async.RunSynchronously
+            let! initializableBlock = HexBigInteger blockNumber
+                                      |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                                      |> Async.AwaitTask
+            let mutable block = initializableBlock
 
             let mutable candle =
                 { close = BigDecimal(0I, 0)
@@ -828,11 +916,10 @@ module Logic =
                 printfn "blockNumber = %A" blockNumber
                 blockNumber <- blockNumber - 1I
 
-                block <-
-                    HexBigInteger blockNumber
-                    |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
-                    |> Async.AwaitTask
-                    |> Async.RunSynchronously
+                let! helpfulBlock = HexBigInteger blockNumber
+                                   |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                                   |> Async.AwaitTask
+                block <- helpfulBlock
 
             let dbCandle =
                 if wasRequiredTransactionsInPeriodOfTime then
@@ -849,6 +936,9 @@ module Logic =
                     None
 
             return dbCandle
+            (*with
+            | _ -> printfn "\n\nERROR!!!\n\n currentTime = %s" <| currentTime.ToString()
+                   return None*)
         }
 
     let sendCallbackAndWriteToDB candle (currentTime: DateTimeOffset) (resolutionTimeAgo: DateTimeOffset) callback =
@@ -860,8 +950,8 @@ module Logic =
                 + $"close:{candle.close}\nvolume:{candle.volume}"
             )
 
-            (DB.addCandle >> Async.RunSynchronously) candle
-        | None -> callback $"No swaps\nfrom:{resolutionTimeAgo.DateTime}\nto:{currentTime.DateTime}"
+            DB.addCandle candle
+        | None -> async{ callback $"No swaps\nfrom:{resolutionTimeAgo.DateTime}\nto:{currentTime.DateTime}"}
 
     let buildCandleSendCallbackAndWriteToDBAsync
         (resolutionTime: TimeSpan)
@@ -878,7 +968,7 @@ module Logic =
                 |> BigInteger
 
             let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
-            sendCallbackAndWriteToDB dbCandle currentTime resolutionTimeAgo callback
+            return! sendCallbackAndWriteToDB dbCandle currentTime resolutionTimeAgo callback
         }
 
     let getCandle (pairId: string, callback, resolutionTime: TimeSpan, web3: Web3) =
@@ -898,19 +988,21 @@ module Logic =
         while true do
             ()
 
-    let firstBlockTimestamp =
-        DateTime(2015, 7, 30, 3, 26, 28).ToUniversalTime()
+    let firstUniswapExchangeTimestamp =
+        DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
 
     let getCandles (pairId, callback, resolutionTime: TimeSpan, web3: Web3) =
         let mutable currentTime = DateTime.Now.ToUniversalTime()
+        //let mutable currentTime = (new DateTime(2018, 11, 2, 10, 34, 56)).ToUniversalTime()
 
-        while currentTime >= firstBlockTimestamp do
+        while currentTime >= firstUniswapExchangeTimestamp do
             currentTime
             |> DateTimeOffset
             |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime pairId callback web3
             |> Async.RunSynchronously
-
             currentTime <- currentTime.Subtract(resolutionTime)
+        callback "Processing completed successfully"
+
 
 open Logic
 
@@ -923,7 +1015,7 @@ let main args =
 
     let web3 =
         new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
-
+    
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
     0

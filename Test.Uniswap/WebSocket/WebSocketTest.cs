@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -59,7 +60,8 @@ namespace Test.Uniswap
             Assert.IsTrue(responseList.Any());
         }
 
-        [TestMethod]
+        //[TestMethod]
+        [Obsolete("Waiting for candles to come may take a long time")]
         public async Task GetCandles_PassWhenCandleReceived()
         {
             var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
@@ -133,7 +135,8 @@ namespace Test.Uniswap
             Assert.IsTrue(responseList.Any());
         }
 
-        [TestMethod]
+        //[TestMethod]
+        [Obsolete("Waiting for candles to come may take a long time")]
         public async Task GetHistoricalCandles_PassWhenCandleReceived()
         {
             var pairId = "0x000ea4a83acefdd62b1b43e9ccc281f442651520";
@@ -292,11 +295,16 @@ namespace Test.Uniswap
 
         #region Helpers
 
-        private async Task<ClientWebSocket> CreateConnectWithLocalWebSocket()
+        private static async Task<System.Net.WebSockets.WebSocket> CreateConnectWithLocalWebSocket()
         {
-            var client = new ClientWebSocket();
-            await client.ConnectAsync(new Uri(webSocketURL), CancellationToken.None);
-            return client;
+            var builder = WebHost.CreateDefaultBuilder()
+                   .UseStartup<Startup>()
+                   .UseEnvironment("Development");
+
+            var server = new TestServer(builder);
+            var client = server.CreateWebSocketClient();
+
+            return await client.ConnectAsync(new Uri(webSocketURL), CancellationToken.None);
         }
 
         #endregion

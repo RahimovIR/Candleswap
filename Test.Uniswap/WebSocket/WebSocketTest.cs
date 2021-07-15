@@ -1,5 +1,12 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Hosting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,6 +15,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using WebSocket.Uniswap;
 using WebSocket.Uniswap.Infrastructure;
 
 namespace Test.Uniswap
@@ -264,6 +272,22 @@ namespace Test.Uniswap
             {
                 throw new Exception(ex.Message);
             }
+        }
+
+        [TestMethod]
+        [DataRow("0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8", 300)]
+        public async Task GetHistoricalCandles_REST(string pairId, int period)
+        {
+            var client = new WebApplicationFactory<Program>().CreateClient();
+
+            var response = await client.GetAsync("https://localhost:5001/api/Candles?" +
+                $"symbol={pairId}" +
+                $"&periodSeconds={period}");
+
+            response.EnsureSuccessStatusCode();
+            var responseToken = JToken.Parse(await response.Content.ReadAsStringAsync());
+            Console.WriteLine(responseToken);
+            Assert.IsTrue(responseToken.Children().Any());
         }
 
         #region Helpers

@@ -992,8 +992,8 @@ module Logic =
         DateTime(2015, 7, 30, 3, 26, 28).ToUniversalTime()
 
     let getCandles (pairId, callback, resolutionTime: TimeSpan, web3: Web3) =
-        //let mutable currentTime = DateTime.Now.ToUniversalTime()
-        let mutable currentTime = (new DateTime(2021, 2, 25, 15, 35, 0)).ToUniversalTime()
+        let mutable currentTime = DateTime.Now.ToUniversalTime()
+        //let mutable currentTime = (new DateTime(2021, 2, 25, 15, 35, 0)).ToUniversalTime()
 
         while currentTime >= firstBlockTimestamp do
             currentTime
@@ -1002,6 +1002,7 @@ module Logic =
             |> Async.RunSynchronously
 
             currentTime <- currentTime.Subtract(resolutionTime)
+
 
 open Logic
 

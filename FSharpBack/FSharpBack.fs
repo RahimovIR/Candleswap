@@ -988,20 +988,21 @@ module Logic =
         while true do
             ()
 
-    let firstBlockTimestamp =
-        DateTime(2015, 7, 30, 3, 26, 28).ToUniversalTime()
+    let firstUniswapExchangeTimestamp =
+        DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
 
     let getCandles (pairId, callback, resolutionTime: TimeSpan, web3: Web3) =
-        //let mutable currentTime = DateTime.Now.ToUniversalTime()
-        let mutable currentTime = (new DateTime(2021, 2, 25, 15, 35, 0)).ToUniversalTime()
+        let mutable currentTime = DateTime.Now.ToUniversalTime()
+        //let mutable currentTime = (new DateTime(2018, 11, 2, 10, 34, 56)).ToUniversalTime()
 
-        while currentTime >= firstBlockTimestamp do
+        while currentTime >= firstUniswapExchangeTimestamp do
             currentTime
             |> DateTimeOffset
             |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime pairId callback web3
             |> Async.RunSynchronously
-
             currentTime <- currentTime.Subtract(resolutionTime)
+        callback "Processing completed successfully"
+
 
 open Logic
 
@@ -1014,20 +1015,6 @@ let main args =
 
     let web3 =
         new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
-
-    (*let transactionHash = "0x1742370a2fc731939fa79b640817ee6de4ca355b19fe4d3c0679b83cdac98b11"
-    let transaction = web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(transactionHash)
-                      |> Async.AwaitTask
-                      |> Async.RunSynchronously
-    let transactionReceipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transactionHash)
-                             |> Async.AwaitTask
-                             |> Async.RunSynchronously
-    let decodedInput = (new EthToTokenSwapInputFunction()).DecodeInput(transaction.Input)
-    let tokenPurchase = transactionReceipt.Logs.DecodeAllEvents<ExchangeV1.TokenPurchaseEventDTO>().[0].Event
-    let ethPurchase = transactionReceipt.Logs.DecodeAllEvents<ExchangeV1.EthPurchaseEventDTO>().[0].Event
-    let firstTransfer = transactionReceipt.Logs.DecodeAllEvents<TransferEventDTO>().[0].Event
-    let secondTransfer = transactionReceipt.Logs.DecodeAllEvents<TransferEventDTO>().[1].Event*)
-    //web3.Eth.Transactions.GetTransactionByHash
     
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
     (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles

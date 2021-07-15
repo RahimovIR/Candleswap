@@ -2,11 +2,19 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="FSharpBack.fs" />
+    <Compile Include="Types.fs" />
+    <Compile Include="Requests.fs" />
+    <Compile Include="Db.fs" />
+    <Compile Include="Dater.fs" />
+    <Compile Include="SwapRouterV3.fs" />
+    <Compile Include="SwapRouterV2.fs" />
+    <Compile Include="ExchangeV1.fs" />
+    <Compile Include="Logic.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>

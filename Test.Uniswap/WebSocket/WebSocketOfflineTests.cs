@@ -1,24 +1,23 @@
-﻿using Contracts.UniswapV3Router.ContractDefinition;
-using Contracts.UniswapV2Router.ContractDefinition;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Util;
-using Nethereum.Web3;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using static FSharpBack.Logic.SwapRouterV3;
-using static FSharpBack.Logic;
-using Nethereum.ABI.FunctionEncoding.Attributes;
+using Contracts.UniswapV3Router.ContractDefinition;
+using Contracts.UniswapV2Router.ContractDefinition;
 using Contracts.UniswapV1Exchange.ContractDefinition;
+using RedDuck.Candleswap.Candles;
+using static RedDuck.Candleswap.Candles.Types;
+using static RedDuck.Candleswap.Candles.Logic;
+using static RedDuck.Candleswap.Candles.SwapRouterV3;
 
 namespace Test.Uniswap
 {
@@ -331,12 +330,12 @@ namespace Test.Uniswap
             var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
                             tokenIn,
                             tokenOut,
-                            new FSharpBack.Candle(_open: 0, high: 0,
+                            new Candle(_open: 0, high: 0,
                                 low: BigDecimal.Parse(maxUInt256StringRepresentation),
                                 close: 0, volume: 0),
                             wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
             var cancelBuildCandle = new CancellationTokenSource();
-            FSharpBack.Candle candle = (await FSharpAsync.StartAsTask(computation,
+            Candle candle = (await FSharpAsync.StartAsTask(computation,
                             new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
                             new FSharpOption<CancellationToken>(cancelBuildCandle.Token))).Item1;
             Console.WriteLine(candle);

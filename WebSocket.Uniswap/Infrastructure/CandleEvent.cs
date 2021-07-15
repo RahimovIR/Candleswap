@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
+using RedDuck.Candleswap.Candles;
 
 namespace WebSocket.Uniswap.Infrastructure
 {
@@ -32,7 +33,7 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                global::FSharpBack.Logic.getCandle(token0Id, token1Id, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                Logic.getCandle(token0Id, token1Id, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
                                             web3), cancelToken.Token);
         }
 
@@ -55,7 +56,7 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                global::FSharpBack.Logic.getCandles(token0Id, token1Id, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                Logic.getCandles(token0Id, token1Id, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
                                             web3), cancelToken.Token);
         }
 

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
 using WebSocket.Uniswap.Infrastructure;
 using System.Threading;
+using RedDuck.Candleswap.Candles;
 
 namespace WebSocket.Uniswap.Controllers
 {
@@ -43,7 +44,7 @@ namespace WebSocket.Uniswap.Controllers
                 : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;
             limit ??= 10;
 
-            var candles = await global::FSharpBack.DB.fetchCandlesTask(token0Id, token1Id, periodSeconds);
+            var candles = await DB.fetchCandlesTask(token0Id, token1Id, periodSeconds);
 
             return candles.Where(c => c.datetime >= startDateTime
             && c.datetime <= endDateTime)

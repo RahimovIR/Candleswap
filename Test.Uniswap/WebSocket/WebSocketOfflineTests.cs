@@ -90,7 +90,7 @@ namespace Test.Uniswap
             InitOfflineTest(@"../../../WebSocket/offlineMockParamsV2Router.json",
                 out Random rnd,
                 out string configJson,
-                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+                out List<(Transaction, TransactionReceipt)> transactionsWithReceipts);
 
             var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -152,7 +152,7 @@ namespace Test.Uniswap
             InitOfflineTest(@"../../../WebSocket/offlineMockParamsV1Router.json",
                 out Random rnd,
                 out string configJson,
-                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+                out List<(Transaction, TransactionReceipt)> transactionsWithReceipts);
 
             var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -210,7 +210,7 @@ namespace Test.Uniswap
             InitOfflineTest(@"../../../WebSocket/offlineMockParamsV1Router_EthPurchaseEvent.json", 
                 out Random rnd, 
                 out string configJson,
-                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+                out List<(Transaction, TransactionReceipt)> transactionsWithReceipts);
 
             var tokenIn = ExchangeV1.wethAddress;
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -250,7 +250,7 @@ namespace Test.Uniswap
                 input += addParams.Replace("0x", string.Empty);
 
                 var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
-                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+                transactionsWithReceipts.Add((transaction, receipt));
             }
             await BuildCandleAndAssert(transactionsWithReceipts, tokenIn,
                                        tokenOut[26..].Insert(0, "0x"));
@@ -263,7 +263,7 @@ namespace Test.Uniswap
             InitOfflineTest(@"../../../WebSocket/offlineMockParamsV1Router_EthPurchaseEvent.json", 
                 out Random rnd, 
                 out string configJson,
-                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+                out List<(Transaction, TransactionReceipt)> transactionsWithReceipts);
 
             var tokenIn = ExchangeV1.wethAddress;
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -303,14 +303,14 @@ namespace Test.Uniswap
                 input += addParams.Replace("0x", string.Empty);
 
                 var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
-                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+                transactionsWithReceipts.Add((transaction, receipt));
             }
             await BuildCandleAndAssert(transactionsWithReceipts, tokenIn,
                                        tokenOut[26..].Insert(0, "0x"));
         }
 
         private static void InitOfflineTest(string configJsonAddress, out Random rnd, out string configJson,
-                                            out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts)
+                                            out List<(Transaction, TransactionReceipt)> transactionsWithReceipts)
         {
             rnd = new Random();
             using (var reader = new StreamReader(configJsonAddress))
@@ -320,18 +320,17 @@ namespace Test.Uniswap
             transactionsWithReceipts = new();
         }
 
-        private static async Task BuildCandleAndAssert(
-            List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts,
+        private static Task BuildCandleAndAssert(
+            List<(Transaction, TransactionReceipt)> transactionsWithReceipts,
             string tokenIn, string tokenOut)
         {
-            var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
+            var computation = CSharp.Logic.PartlyBuildCandle(transactionsWithReceipts.ToArray(),
                             tokenIn,
                             tokenOut,
                             new Candle(_open: 0, high: 0,
-                                low: BigDecimal.Parse(maxUInt256StringRepresentation),
+                                low: BigDecimal.Parse(CSharp.Logic.MaxUInt256StringRepresentation),
                                 close: 0, volume: 0),
                             wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
-            var cancelBuildCandle = new CancellationTokenSource();
             Candle candle = computation.Item1;
             Console.WriteLine(candle);
             Assert.IsNotNull(candle);
@@ -340,6 +339,8 @@ namespace Test.Uniswap
             Assert.IsTrue(candle.low != 0);
             Assert.IsTrue(candle.close != 0);
             Assert.IsTrue(candle.volume != 0);
+            
+            return Task.CompletedTask;
         }
 
         public string To32ByteWord(object item)

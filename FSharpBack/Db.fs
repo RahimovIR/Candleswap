@@ -5,7 +5,7 @@ open System.Collections.Generic
 open Dapper
 open RedDuck.Candleswap.Candles.Types
 
-module internal Db =
+module Db =
     let private databaseFilename = __SOURCE_DIRECTORY__ + @"\Database\candles.db"
 
     let private connectionString = sprintf "Data Source=%s;Version=3;" databaseFilename

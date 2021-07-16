@@ -10,8 +10,8 @@ open Nethereum.Util
 open Contracts.UniswapV3Router.ContractDefinition
 
 module SwapRouterV3 =
-    let routerAddress =
-        "0xe592427a0aece92de3edee1f18e0157c05861564"
+    let routerAddress = "0xe592427a0aece92de3edee1f18e0157c05861564"
+    let addresses = [ routerAddress ]
 
     let exactInputSingleId = "0x414bf389"
     let exactOutputSingleId = "0xdb3e2198"

@@ -9,6 +9,7 @@ open Contracts.UniswapV1Exchange.ContractDefinition
 
 module ExchangeV1 =
     let exchangeAddress = "0x09cabec1ead1c0ba254b09efb3ee13841712be14"
+    let addresses = [ exchangeAddress ]
     let wethAddress = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 
     let ethToTokenSwapInputId = "0xf39b5b9b"

@@ -1,8 +1,10 @@
 ﻿namespace RedDuck.Candleswap.Candles
 
 open System
+open System.Numerics
 open FSharp.Data.GraphQL
 open Newtonsoft.Json.Linq
+open RedDuck.Candleswap.Candles.Types
 
 module internal Requests =
     let swapsQuery id =

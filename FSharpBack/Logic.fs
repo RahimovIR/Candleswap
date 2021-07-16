@@ -14,62 +14,64 @@ module Logic =
     let maxUInt256StringRepresentation =
         "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 
+    // Updates candle information with new open, close, high and low prices if presented.
     let partlyBuildCandle
-        (transactionsWithReceipts: Tuple<Transaction, TransactionReceipt> [])
+        (transactionsWithReceipts: (Transaction * TransactionReceipt) [])
         token0Id
         token1Id
         (candle: Candle)
         wasRequiredTransactionsInPeriodOfTime
         firstIterFlag
         =
-        async {
-            let mutable closePrice = candle.close
-            let mutable lowPrice = candle.low
-            let mutable highPrice = candle.high
-            let mutable openPrice = candle._open
-            let mutable volume = candle.volume
-            let mutable _wasRequiredTransactionsInPeriodOfTime = wasRequiredTransactionsInPeriodOfTime
-            let mutable _firstIterFlag = firstIterFlag
 
-            for transactionWithReceipt in transactionsWithReceipts do
-                let (transaction, receipt) = transactionWithReceipt
-                let (tokenInAddress, tokenOutAddress, amountIn, amountOut) = 
-                    if transaction.To = SwapRouterV3.routerAddress 
-                    then SwapRouterV3.getInfoFromRouter transaction receipt
-                    else if transaction.To = SwapRouterV2.router02Address ||
-                            transaction.To = SwapRouterV2.router01Address
-                    then SwapRouterV2.getInfoFromRouter transaction receipt
-                    else if transaction.To = ExchangeV1.exchangeAddress
-                    then ExchangeV1.getInfoFromExchange transaction receipt
-                    else ("", "", 0I, 0I)
+        let tryGetTransactionInfo addresses infoFunc (transaction: Transaction) =
+            if List.contains transaction.To addresses 
+            then Some infoFunc
+            else None
+        
+        /// Returns Some function to obtain transaction information if transaction recipient 
+        /// matches any known.
+        let transactionData transaction receipt = 
+          [ tryGetTransactionInfo SwapRouterV3.addresses SwapRouterV3.getInfoFromRouter
+            tryGetTransactionInfo SwapRouterV2.addresses SwapRouterV2.getInfoFromRouter
+            tryGetTransactionInfo ExchangeV1.addresses ExchangeV1.getInfoFromExchange ] 
+          |> List.map (fun f -> f transaction)
+          |> List.tryFind Option.isSome 
+          |> Option.get
+          |> Option.map (fun f -> f transaction receipt)
 
-                if token0Id = tokenInAddress && token1Id = tokenOutAddress then
-                    _wasRequiredTransactionsInPeriodOfTime <- true
-                    let currentPrice =
-                        BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
+        /// Extended information about transactions to Uniswap contracts.
+        let actualTransactionsData = 
+            transactionsWithReceipts
+            |> Array.map (fun (t, r) -> transactionData t r)
+            |> Array.choose id
+            |> Array.filter (fun (inAddr, outAddr, _, _) -> (inAddr, outAddr) = (token0Id, token1Id))
 
-                    if _firstIterFlag then
-                        closePrice <- currentPrice
-                        _firstIterFlag <- false
+        let currentPrice (_, _, amountIn, amountOut) = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
 
-                    if (currentPrice > highPrice) then
-                        highPrice <- currentPrice
+        let openPrice = (Array.last >> currentPrice) actualTransactionsData
+        let closePrice = (Array.head >> currentPrice) actualTransactionsData
 
-                    if (currentPrice < lowPrice) then
-                        lowPrice <- currentPrice
+        let high, low, volume = 
+            let folder (high, low, volume) price =
+                (if high > price then high else price),
+                (if low < price then low else price),
+                (volume + 1u)
+            actualTransactionsData
+            |> Seq.map currentPrice
+            |> Seq.fold folder (candle.high, candle.low, candle.volume)
 
-                    openPrice <- currentPrice
-                    volume <- volume + 1u
+        let candle = { close = closePrice
+                       _open = openPrice
+                       low = low
+                       high = high
+                       volume = volume }
+        
+        let anyTransactionInPeriod = 
+            not (Array.isEmpty actualTransactionsData) || wasRequiredTransactionsInPeriodOfTime
+        let firstIterFlag = if anyTransactionInPeriod then false else firstIterFlag
 
-            return
-                ({ close = closePrice
-                   low = lowPrice
-                   high = highPrice
-                   _open = openPrice
-                   volume = volume },
-                 _wasRequiredTransactionsInPeriodOfTime,
-                 _firstIterFlag)
-        }
+        candle, anyTransactionInPeriod, firstIterFlag
 
     let buildCandleAsync
         (currentTime: DateTimeOffset)
@@ -144,7 +146,7 @@ module Logic =
                 let successfulSwapTransactionsWithReceipts =
                     filterSuccessfulTranscations swapTransactionsWithReceipts
 
-                let! (_candle, _wasRequiredTransactionsInPeriodOfTime, _firstIterFlag) =
+                let (_candle, _wasRequiredTransactionsInPeriodOfTime, _firstIterFlag) =
                     partlyBuildCandle
                         successfulSwapTransactionsWithReceipts
                         token0Id
@@ -179,9 +181,6 @@ module Logic =
                     None
 
             return dbCandle
-            (*with
-            | _ -> printfn "\n\nERROR!!!\n\n currentTime = %s" <| currentTime.ToString()
-                   return None*)
         }
 
     let sendCallbackAndWriteToDB candle (currentTime: DateTimeOffset) (resolutionTimeAgo: DateTimeOffset) callback =
@@ -234,15 +233,19 @@ module Logic =
     let firstUniswapExchangeTimestamp =
         DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
 
+    let rec getTimeSamples (period: DateTime * DateTime) rate =
+        let a, b = period
+        if a >= b then 
+            []
+        else
+            DateTimeOffset a :: getTimeSamples (a.Add rate, b) rate
+
     let getCandles (pairId, callback, resolutionTime: TimeSpan, web3: Web3) =
-        let mutable currentTime = DateTime.Now.ToUniversalTime()
-
-        while currentTime >= firstUniswapExchangeTimestamp do
-            currentTime
-            |> DateTimeOffset
-            |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime pairId callback web3
+        let b = DateTime.Now.ToUniversalTime()
+        let a = firstUniswapExchangeTimestamp
+        for t in getTimeSamples (a, b) resolutionTime do
+            buildCandleSendCallbackAndWriteToDBAsync 
+                resolutionTime pairId callback web3 t
             |> Async.RunSynchronously
-            currentTime <- currentTime.Subtract(resolutionTime)
+        
         callback "Processing completed successfully"
-
-

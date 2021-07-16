@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Utils.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Requests.fs" />
     <Compile Include="Db.fs" />
@@ -14,6 +15,7 @@
     <Compile Include="SwapRouterV2.fs" />
     <Compile Include="ExchangeV1.fs" />
     <Compile Include="Logic.fs" />
+    <Compile Include="CSharp.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

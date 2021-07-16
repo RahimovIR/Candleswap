@@ -5,8 +5,6 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.FSharp.Control;
-using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Util;
@@ -16,7 +14,6 @@ using Contracts.UniswapV2Router.ContractDefinition;
 using Contracts.UniswapV1Exchange.ContractDefinition;
 using RedDuck.Candleswap.Candles;
 using static RedDuck.Candleswap.Candles.Types;
-using static RedDuck.Candleswap.Candles.Logic;
 using static RedDuck.Candleswap.Candles.SwapRouterV3;
 
 namespace Test.Uniswap
@@ -33,7 +30,7 @@ namespace Test.Uniswap
             InitOfflineTest(@"../../../WebSocket/offlineMockParams.json",
                 out Random rnd,
                 out string configJson,
-                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+                out List<(Transaction, TransactionReceipt)> transactionsWithReceipts);
 
             var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -78,7 +75,7 @@ namespace Test.Uniswap
                 input += addParams.Replace("0x", string.Empty);
 
                 var transaction = new Transaction() { Input = input, To = routerAddress };
-                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+                transactionsWithReceipts.Add((transaction, receipt));
             }
 
             // substring from 26th element due to tokens being decoded in 16 bytes, not 32
@@ -142,7 +139,7 @@ namespace Test.Uniswap
                 input += addParams.Replace("0x", string.Empty);
 
                 var transaction = new Transaction() { Input = input, To = SwapRouterV2.router02Address };
-                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+                transactionsWithReceipts.Add((transaction, receipt));
             }
             await BuildCandleAndAssert(transactionsWithReceipts, tokenIn[26..].Insert(0, "0x"),
                                        tokenOut[26..].Insert(0, "0x"));
@@ -200,7 +197,7 @@ namespace Test.Uniswap
                 input += addParams.Replace("0x", string.Empty);
 
                 var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
-                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+                transactionsWithReceipts.Add((transaction, receipt));
             }
             await BuildCandleAndAssert(transactionsWithReceipts, tokenIn[26..].Insert(0, "0x"),
                                        tokenOut[26..].Insert(0, "0x"));
@@ -335,9 +332,7 @@ namespace Test.Uniswap
                                 close: 0, volume: 0),
                             wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
             var cancelBuildCandle = new CancellationTokenSource();
-            Candle candle = (await FSharpAsync.StartAsTask(computation,
-                            new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
-                            new FSharpOption<CancellationToken>(cancelBuildCandle.Token))).Item1;
+            Candle candle = computation.Item1;
             Console.WriteLine(candle);
             Assert.IsNotNull(candle);
             Assert.IsTrue(candle._open != 0);

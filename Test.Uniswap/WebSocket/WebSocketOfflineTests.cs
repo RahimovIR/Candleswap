@@ -31,13 +31,10 @@ namespace Test.Uniswap
         [DataRow(3, 1)]
         public async Task GetV3Candles_Offline(int tuplesCount, int swapsCount)
         {
-            var rnd = new Random();
-            string configJson;
-            using (var reader = new StreamReader(@"../../../WebSocket/offlineMockParams.json"))
-            {
-                configJson = reader.ReadToEnd();
-            }
-            List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts = new();
+            InitOfflineTest(@"../../../WebSocket/offlineMockParams.json",
+                out Random rnd,
+                out string configJson,
+                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
 
             var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -84,38 +81,20 @@ namespace Test.Uniswap
                 var transaction = new Transaction() { Input = input, To = routerAddress };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
-            var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
-                // substring from 26th element due to tokens being decoded in 16 bytes, not 32
-                tokenIn[26..].Insert(0, "0x"),
-                tokenOut[26..].Insert(0, "0x"),
-                new FSharpBack.Candle(_open: 0, high: 0,
-                    low: BigDecimal.Parse(maxUInt256StringRepresentation),
-                    close: 0, volume: 0),
-                wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
-            var cancelBuildCandle = new CancellationTokenSource();
-            FSharpBack.Candle candle = (await FSharpAsync.StartAsTask(computation,
-                            new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
-                            new FSharpOption<CancellationToken>(cancelBuildCandle.Token))).Item1;
-            Console.WriteLine(candle);
-            Assert.IsNotNull(candle);
-            Assert.IsTrue(candle._open != 0);
-            Assert.IsTrue(candle.high != 0);
-            Assert.IsTrue(candle.low != 0);
-            Assert.IsTrue(candle.close != 0);
-            Assert.IsTrue(candle.volume != 0);
+
+            // substring from 26th element due to tokens being decoded in 16 bytes, not 32
+            await BuildCandleAndAssert(transactionsWithReceipts, tokenIn[26..].Insert(0, "0x"),
+                                       tokenOut[26..].Insert(0, "0x"));
         }
 
         [TestMethod]
         [DataRow(3, 1)]
         public async Task GetV2Candles_Offline(int tuplesCount, int swapsCount)
         {
-            var rnd = new Random();
-            string configJson;
-            using (var reader = new StreamReader(@"../../../WebSocket/offlineMockParamsV2Router.json"))
-            {
-                configJson = reader.ReadToEnd();
-            }
-            List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts = new();
+            InitOfflineTest(@"../../../WebSocket/offlineMockParamsV2Router.json",
+                out Random rnd,
+                out string configJson,
+                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
 
             var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -166,38 +145,18 @@ namespace Test.Uniswap
                 var transaction = new Transaction() { Input = input, To = SwapRouterV2.router02Address };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
-            var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
-                // substring from 26th element due to tokens being decoded in 16 bytes, not 32
-                tokenIn[26..].Insert(0, "0x"),
-                tokenOut[26..].Insert(0, "0x"),
-                new FSharpBack.Candle(_open: 0, high: 0,
-                    low: BigDecimal.Parse(maxUInt256StringRepresentation),
-                    close: 0, volume: 0),
-                wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
-            var cancelBuildCandle = new CancellationTokenSource();
-            FSharpBack.Candle candle = (await FSharpAsync.StartAsTask(computation,
-                            new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
-                            new FSharpOption<CancellationToken>(cancelBuildCandle.Token))).Item1;
-            Console.WriteLine(candle);
-            Assert.IsNotNull(candle);
-            Assert.IsTrue(candle._open != 0);
-            Assert.IsTrue(candle.high != 0);
-            Assert.IsTrue(candle.low != 0);
-            Assert.IsTrue(candle.close != 0);
-            Assert.IsTrue(candle.volume != 0);
+            await BuildCandleAndAssert(transactionsWithReceipts, tokenIn[26..].Insert(0, "0x"),
+                                       tokenOut[26..].Insert(0, "0x"));
         }
 
         [TestMethod]
-        [DataRow(1, 1)]
-        public async Task GetV1Candles_Offline(int tuplesCount, int swapsCount)
+        [DataRow(3, 1)]
+        public async Task GetV1Candles_TransferEvent_Offline(int tuplesCount, int swapsCount)
         {
-            var rnd = new Random();
-            string configJson;
-            using (var reader = new StreamReader(@"../../../WebSocket/offlineMockParamsV1Router.json"))
-            {
-                configJson = reader.ReadToEnd();
-            }
-            List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts = new();
+            InitOfflineTest(@"../../../WebSocket/offlineMockParamsV1Router.json",
+                out Random rnd,
+                out string configJson,
+                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
 
             var tokenIn = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
             var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
@@ -244,14 +203,138 @@ namespace Test.Uniswap
                 var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
                 transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
             }
+            await BuildCandleAndAssert(transactionsWithReceipts, tokenIn[26..].Insert(0, "0x"),
+                                       tokenOut[26..].Insert(0, "0x"));
+        }
+
+        [TestMethod]
+        [DataRow(3, 1)]
+        public async Task GetV1Candles_EthPurchaseEvent_Offline(int tuplesCount, int swapsCount)
+        {
+            InitOfflineTest(@"../../../WebSocket/offlineMockParamsV1Router_EthPurchaseEvent.json", 
+                out Random rnd, 
+                out string configJson,
+                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+
+            var tokenIn = ExchangeV1.wethAddress;
+            var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
+            for (var i = 0; i < tuplesCount; i++)
+            {
+                var purchaseEvents = new List<ExchangeV1.EthPurchaseEventDTO>();
+                for (int j = 0; j < swapsCount; j++)
+                {
+                    purchaseEvents.Add(GenerateV1EthPurchaseEvent(rnd, tokenOut));
+                }
+
+                var swapEventsTokens = new List<JToken>();
+                foreach (var purchaseEvent in purchaseEvents)
+                {
+                    var transferJson = JObject.Parse(configJson);
+                    transferJson["data"] = string.Empty;
+                    transferJson["topics"] = new JArray()
+                    {
+                        transferJson["signature"],
+                        purchaseEvent.Buyer,
+                        purchaseEvent.TokensSold,
+                        purchaseEvent.EthBought
+                    };
+                    transferJson.Remove("signature");
+                    swapEventsTokens.Add(transferJson);
+                }
+                var receipt = new TransactionReceipt { Logs = JArray.FromObject(swapEventsTokens) };
+                var swapExactParams = new EthToTokenSwapOutputFunction()
+                {
+                    Tokens_bought = rnd.Next(1, 100000),
+                    Deadline = rnd.Next(1, 100000),
+                };
+
+                var input = ExchangeV1.ethToTokenSwapOutputId;
+                var addParams = To32ByteWord(swapExactParams.Tokens_bought)
+                    + To32ByteWord(swapExactParams.Deadline);
+                input += addParams.Replace("0x", string.Empty);
+
+                var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
+                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+            }
+            await BuildCandleAndAssert(transactionsWithReceipts, tokenIn,
+                                       tokenOut[26..].Insert(0, "0x"));
+        }
+        
+        [TestMethod]
+        [DataRow(3, 1)]
+        public async Task GetV1Candles_TokenPurchaseEvent_Offline(int tuplesCount, int swapsCount)
+        {
+            InitOfflineTest(@"../../../WebSocket/offlineMockParamsV1Router_EthPurchaseEvent.json", 
+                out Random rnd, 
+                out string configJson,
+                out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts);
+
+            var tokenIn = ExchangeV1.wethAddress;
+            var tokenOut = To32ByteWord(rnd.Next(0, 10000)).ToLowerInvariant();
+            for (var i = 0; i < tuplesCount; i++)
+            {
+                var purchaseEvents = new List<ExchangeV1.TokenPurchaseEventDTO>();
+                for (int j = 0; j < swapsCount; j++)
+                {
+                    purchaseEvents.Add(GenerateV1TokenPurchaseEvent(rnd, tokenOut));
+                }
+
+                var swapEventsTokens = new List<JToken>();
+                foreach (var purchaseEvent in purchaseEvents)
+                {
+                    var transferJson = JObject.Parse(configJson);
+                    transferJson["data"] = string.Empty;
+                    transferJson["topics"] = new JArray()
+                    {
+                        transferJson["signature"],
+                        purchaseEvent.Buyer,
+                        purchaseEvent.TokensBought,
+                        purchaseEvent.EthSold
+                    };
+                    transferJson.Remove("signature");
+                    swapEventsTokens.Add(transferJson);
+                }
+                var receipt = new TransactionReceipt { Logs = JArray.FromObject(swapEventsTokens) };
+                var swapExactParams = new TokenToEthSwapOutputFunction()
+                {
+                    Eth_bought = rnd.Next(1, 100000),
+                    Deadline = rnd.Next(1, 100000),
+                };
+
+                var input = ExchangeV1.ethToTokenSwapOutputId;
+                var addParams = To32ByteWord(swapExactParams.Eth_bought)
+                    + To32ByteWord(swapExactParams.Deadline);
+                input += addParams.Replace("0x", string.Empty);
+
+                var transaction = new Transaction() { Input = input, To = ExchangeV1.exchangeAddress };
+                transactionsWithReceipts.Add(Tuple.Create(transaction, receipt));
+            }
+            await BuildCandleAndAssert(transactionsWithReceipts, tokenIn,
+                                       tokenOut[26..].Insert(0, "0x"));
+        }
+
+        private static void InitOfflineTest(string configJsonAddress, out Random rnd, out string configJson,
+                                            out List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts)
+        {
+            rnd = new Random();
+            using (var reader = new StreamReader(configJsonAddress))
+            {
+                configJson = reader.ReadToEnd();
+            }
+            transactionsWithReceipts = new();
+        }
+
+        private static async Task BuildCandleAndAssert(
+            List<Tuple<Transaction, TransactionReceipt>> transactionsWithReceipts,
+            string tokenIn, string tokenOut)
+        {
             var computation = partlyBuildCandle(transactionsWithReceipts.ToArray(),
-                // substring from 26th element due to tokens being decoded in 16 bytes, not 32
-                tokenIn[26..].Insert(0, "0x"),
-                tokenOut[26..].Insert(0, "0x"),
-                new FSharpBack.Candle(_open: 0, high: 0,
-                    low: BigDecimal.Parse(maxUInt256StringRepresentation),
-                    close: 0, volume: 0),
-                wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
+                            tokenIn,
+                            tokenOut,
+                            new FSharpBack.Candle(_open: 0, high: 0,
+                                low: BigDecimal.Parse(maxUInt256StringRepresentation),
+                                close: 0, volume: 0),
+                            wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
             var cancelBuildCandle = new CancellationTokenSource();
             FSharpBack.Candle candle = (await FSharpAsync.StartAsTask(computation,
                             new FSharpOption<TaskCreationOptions>(TaskCreationOptions.None),
@@ -318,6 +401,26 @@ namespace Test.Uniswap
                     To = To32ByteWord(rnd.Next(1, 1000)).ToLowerInvariant(),
                     Value = rnd.Next(1, 1000)
                 }
+            };
+        }
+
+        private ExchangeV1.TokenPurchaseEventDTO GenerateV1TokenPurchaseEvent(Random rnd, string tokenOut)
+        {
+            return new ExchangeV1.TokenPurchaseEventDTO
+            {
+                Buyer = tokenOut,
+                EthSold = rnd.Next(1, 1000),
+                TokensBought = rnd.Next(1, 1000)
+            };
+        }
+
+        private ExchangeV1.EthPurchaseEventDTO GenerateV1EthPurchaseEvent(Random rnd, string tokenOut)
+        {
+            return new ExchangeV1.EthPurchaseEventDTO
+            {
+                Buyer = tokenOut,
+                EthBought = rnd.Next(1, 1000),
+                TokensSold = rnd.Next(1, 1000)
             };
         }
 

@@ -13,7 +13,11 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FSharpBackTest", "FSharpBac
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Contracts", "Contracts\Contracts.fsproj", "{BBB9625B-CA38-419A-9C6A-DD4D1C3B85DF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UniswapView", "UniswapView\UniswapView.csproj", "{2A35943C-5D78-45CB-A1CF-FF15684BA239}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UniswapView", "UniswapView\UniswapView.csproj", "{2A35943C-5D78-45CB-A1CF-FF15684BA239}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "View.Client", "View\src\View.Client\View.Client.fsproj", "{AC97FFB5-FD67-45AE-8A69-8942590DEC3E}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "View.Server", "View\src\View.Server\View.Server.fsproj", "{526D4EB6-A980-43A8-ACD1-B580C9EF0FC9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,6 +49,14 @@ Global
 		{2A35943C-5D78-45CB-A1CF-FF15684BA239}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2A35943C-5D78-45CB-A1CF-FF15684BA239}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2A35943C-5D78-45CB-A1CF-FF15684BA239}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC97FFB5-FD67-45AE-8A69-8942590DEC3E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC97FFB5-FD67-45AE-8A69-8942590DEC3E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC97FFB5-FD67-45AE-8A69-8942590DEC3E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC97FFB5-FD67-45AE-8A69-8942590DEC3E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{526D4EB6-A980-43A8-ACD1-B580C9EF0FC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{526D4EB6-A980-43A8-ACD1-B580C9EF0FC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{526D4EB6-A980-43A8-ACD1-B580C9EF0FC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{526D4EB6-A980-43A8-ACD1-B580C9EF0FC9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

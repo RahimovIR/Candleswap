@@ -18,15 +18,16 @@ namespace WebSocket.Uniswap.Controllers
     {
         //curl -X GET "https://localhost:44359/api/Candles?symbol=0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc&periodSeconds=1800&startTime=1625121600&endTime=1625125519&limit=1" -H  "accept: */*"
         [HttpGet()]
-        public async Task<object> GetHistoricalCandles([FromQuery] string symbol,
+        public async Task<object> GetHistoricalCandles([FromQuery] string token0Id,
+            [FromQuery] string token1Id,
             [FromQuery] int periodSeconds,
             [FromQuery] long? startTime,
             [FromQuery] long? endTime,
             [FromQuery] int? limit)
         {
-            if (string.IsNullOrEmpty(symbol))
+            if (string.IsNullOrEmpty(token0Id) || string.IsNullOrEmpty(token1Id))
             {
-                return BadRequest("A symbol should be provided");
+                return BadRequest("Two tokens should be provided");
             }
 
             if (periodSeconds == default)
@@ -34,17 +35,17 @@ namespace WebSocket.Uniswap.Controllers
                 return BadRequest("An interval should be provided");
             }
 
-            var startDateTime = startTime == null 
+            var startDateTime = startTime == null
                 ? DateTimeOffset.MinValue.UtcDateTime
                 : DateTimeOffset.FromUnixTimeSeconds(startTime.Value).UtcDateTime;
-            var endDateTime = endTime == null 
+            var endDateTime = endTime == null
                 ? DateTimeOffset.MaxValue.UtcDateTime
                 : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;
             limit ??= 10;
 
-            var candles = await global::FSharpBack.DB.fetchCandlesTask(symbol, periodSeconds);
+            var candles = await global::FSharpBack.DB.fetchCandlesTask(token0Id, token1Id, periodSeconds);
 
-            return candles.Where(c => c.datetime >= startDateTime 
+            return candles.Where(c => c.datetime >= startDateTime
             && c.datetime <= endDateTime)
                 .OrderByDescending(c => c.datetime)
                 .Take(limit.Value);

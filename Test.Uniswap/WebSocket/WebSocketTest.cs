@@ -35,6 +35,7 @@ namespace Test.Uniswap
 
             var responseList = new List<string>();
             CandleEvent.SubscribeCandles(
+                pairId,
                      pairId,
                      c =>
                      {
@@ -55,7 +56,7 @@ namespace Test.Uniswap
             }
             finally
             {
-                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+                CandleEvent.UnsubscribeCandles(pairId, pairId, (int)resolutionTime.TotalSeconds);
             }
             Assert.IsTrue(responseList.Any());
         }
@@ -70,6 +71,7 @@ namespace Test.Uniswap
 
             var candlesList = new List<string>();
             CandleEvent.SubscribeCandles(
+                     pairId, 
                      pairId,
                      c =>
                      {
@@ -96,7 +98,7 @@ namespace Test.Uniswap
             }
             finally
             {
-                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+                CandleEvent.UnsubscribeCandles(pairId, pairId, (int)resolutionTime.TotalSeconds);
             }
             Assert.IsTrue(candlesList.Any(), $"No candles received for {delay}");
         }
@@ -110,6 +112,7 @@ namespace Test.Uniswap
 
             var responseList = new List<string>();
             CandleEvent.SubscribeHistoricalCandles(
+                pairId,
                      pairId,
                      c =>
                      {
@@ -130,7 +133,7 @@ namespace Test.Uniswap
             }
             finally
             {
-                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+                CandleEvent.UnsubscribeCandles(pairId, pairId, (int)resolutionTime.TotalSeconds);
             }
             Assert.IsTrue(responseList.Any());
         }
@@ -145,6 +148,7 @@ namespace Test.Uniswap
 
             var candlesList = new List<string>();
             CandleEvent.SubscribeHistoricalCandles(
+                     pairId,
                      pairId,
                      c =>
                      {
@@ -169,7 +173,7 @@ namespace Test.Uniswap
             }
             finally
             {
-                CandleEvent.UnsubscribeCandles(pairId, (int)resolutionTime.TotalSeconds);
+                CandleEvent.UnsubscribeCandles(pairId, pairId, (int)resolutionTime.TotalSeconds);
             }
             Assert.IsTrue(candlesList.Any());
         }

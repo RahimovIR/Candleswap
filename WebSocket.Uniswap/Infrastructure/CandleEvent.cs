@@ -13,8 +13,9 @@ namespace WebSocket.Uniswap.Infrastructure
     {
         private static readonly SortedDictionary<(string, int), CancellationTokenSource> EventsInvoked = new();
 
-        public static void SubscribeCandles(string uniswapId, Action<string> onCandle, int resolutionSeconds)
+        public static void SubscribeCandles(string token0Id, string token1Id, Action<string> onCandle, int resolutionSeconds)
         {
+            var uniswapId = string.Join(",", token0Id, token1Id);
             if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out _))
             {
                 return;
@@ -31,12 +32,13 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                global::FSharpBack.Logic.getCandle(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                global::FSharpBack.Logic.getCandle(token0Id, token1Id, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
                                             web3), cancelToken.Token);
         }
 
-        public static void SubscribeHistoricalCandles(string uniswapId, Action<string> onCandle, int resolutionSeconds)
+        public static void SubscribeHistoricalCandles(string token0Id, string token1Id, Action<string> onCandle, int resolutionSeconds)
         {
+            var uniswapId = string.Join(",", token0Id, token1Id);
             if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out _))
             {
                 return;
@@ -53,13 +55,13 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                global::FSharpBack.Logic.getCandles(uniswapId, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
+                global::FSharpBack.Logic.getCandles(token0Id, token1Id, fsharpFunc, TimeSpan.FromSeconds(resolutionSeconds),
                                             web3), cancelToken.Token);
         }
 
-        public static void UnsubscribeCandles(string uniswapId, int resolutionSeconds)
+        public static void UnsubscribeCandles(string token0Id, string token1Id, int resolutionSeconds)
         {
-            if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out var cancelToken))
+            if (EventsInvoked.TryGetValue((string.Join(",", token0Id, token1Id), resolutionSeconds), out var cancelToken))
             {
                 cancelToken.Cancel();
             }

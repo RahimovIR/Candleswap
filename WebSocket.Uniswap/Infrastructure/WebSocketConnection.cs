@@ -87,7 +87,16 @@ namespace WebSocket.Uniswap.Infrastructure
                             OnReceivePingPong(webSocketMessage);
                         }
                         else if (webSocketMessage.Contains("candles"))
-                            OnReceiveCandlesSubscribeRequest(webSocketMessage);
+                        {
+                            if (webSocketMessage.Contains("subscribe"))
+                            {
+                                OnReceiveCandlesSubscribeRequest(webSocketMessage);
+                            }
+                            else if (webSocketMessage.Contains("unsubscribe"))
+                            {
+                                OnReceiveCandlesUnsubscribeRequest(webSocketMessage);
+                            }
+                        }
                         else
                             OnReceiveText(webSocketMessage);
                     }
@@ -129,13 +138,20 @@ namespace WebSocket.Uniswap.Infrastructure
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = arrayKeyParam[1] switch 
+            int resolution = arrayKeyParam[1] switch
             {
                 "1m" => 60,
                 _ => 10
             };
 
-            CandleEvent.SubscribeCandles(arrayKeyParam[2], OnCandleUpdateReceived, resolution);
+            if (arrayKeyParam.Length > 3)
+            {
+                CandleEvent.SubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);
+            }
+            else
+            {
+                //TODO: Subscribe candles with pairId
+            }
 
             ReceiveText?.Invoke(this, webSocketMessage);
         }
@@ -144,13 +160,19 @@ namespace WebSocket.Uniswap.Infrastructure
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = arrayKeyParam[1] switch 
+            int resolution = arrayKeyParam[1] switch
             {
                 "1m" => 60,
                 _ => 10
             };
-
-            CandleEvent.UnsubscribeCandles(arrayKeyParam[2], resolution);
+            if (arrayKeyParam.Length > 3)
+            {
+                CandleEvent.UnsubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], resolution);
+            }
+            else
+            {
+                //TODO: Unsubscribe candles with pairId
+            }
 
             ReceiveText?.Invoke(this, webSocketMessage);
         }

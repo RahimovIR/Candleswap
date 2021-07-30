@@ -196,7 +196,8 @@ type Candle =
 type DBCandle =
     { datetime: DateTime
       resolutionSeconds: int
-      uniswapPairId: string
+      token0Id: string
+      token1Id: string
       _open: string
       high: string
       low: string
@@ -214,19 +215,19 @@ module DB =
     let private connection = new SQLiteConnection(connectionString)
     do connection.Open()
 
-    let private fetchCandlesSql = @"select datetime, resolutionSeconds, uniswapPairId, open as _open, high, low, close, volume from candles
-        where uniswapPairId = @uniswapPairId and resolutionSeconds = @resolutionSeconds"
+    let private fetchCandlesSql = @"select datetime, resolutionSeconds, token0Id, token1Id, open as _open, high, low, close, volume from candles
+        where token0Id = @token0Id and token1Id = @token1Id and resolutionSeconds = @resolutionSeconds"
 
     let private insertCandleSql =
-        "insert into candles(datetime, resolutionSeconds, uniswapPairId, open, high, low, close, volume) "
-        + "values (@datetime, @resolutionSeconds, @uniswapPairId, @_open, @high, @low, @close, @volume)"
+        "insert into candles(datetime, resolutionSeconds, token0Id, token1Id, open, high, low, close, volume) "
+        + "values (@datetime, @resolutionSeconds, @token0Id, @token1Id, @_open, @high, @low, @close, @volume)"
 
     let private updateCandleSql =
-        "update candles set open = @_open, high = @high, low = @low, close = @close, volume = @volume) "
-        + "values uniswapPairId = @uniswapPairId and resolutionSeconds = @resolutionSeconds and datetime = @datetime)"
+        "update candles set open = @_open, high = @high, low = @low, close = @close, volume = @volume "
+        + "where token0Id = @token0Id and token1Id = @token1Id and resolutionSeconds = @resolutionSeconds and datetime = @datetime"
 
     let private getCandleByDatetimeSql =
-        "select datetime, resolutionSeconds, uniswapPairId, open, high, low, close, volume"
+        "select datetime, resolutionSeconds, token0Id, token1Id, open, high, low, close, volume"
         + "from candles"
         + "where datetime = @datetime"
 
@@ -239,7 +240,7 @@ module DB =
 
     let private dbExecute (connection: SQLiteConnection) (sql: string) (data: _) = connection.ExecuteAsync(sql, data)
 
-    let fetchCandles (uniswapPairId: string) (resolutionSeconds: int) =
+    let fetchCandles (token0Id: string) (token1Id:string) (resolutionSeconds: int) =
         async {
             let! candles =
                 Async.AwaitTask
@@ -247,7 +248,8 @@ module DB =
                     connection
                     fetchCandlesSql
                     (Some(
-                        dict [ "uniswapPairId" => uniswapPairId
+                        dict [ "token0Id" => token0Id
+                               "token1Id" => token1Id
                                "resolutionSeconds" => resolutionSeconds ]
                     ))
 
@@ -255,9 +257,9 @@ module DB =
         }
 
 
-    let fetchCandlesTask (uniswapPairId: string) (resolutionSeconds: int) =
+    let fetchCandlesTask (token0Id: string) (token1Id:string) (resolutionSeconds: int) =
         Async.StartAsTask
-        <| fetchCandles uniswapPairId resolutionSeconds
+        <| fetchCandles token0Id token1Id resolutionSeconds
 
     let addCandle candle =
         async {
@@ -832,7 +834,8 @@ module Logic =
         (currentTime: DateTimeOffset)
         (resolutionTime: TimeSpan)
         resolutionTimeAgoUnix
-        pairId
+        token0Id
+        token1Id
         (web3: Web3)
         =
 
@@ -854,9 +857,6 @@ module Logic =
                     r.Status.Value <> 0I)
 
         async {
-            let pair = Requests.takePoolInfo(pairId).Value
-            let token0Id = pair.token0Id
-            let token1Id = pair.token1Id
             //try
             let! initializableBlockNumber = currentTime.ToUnixTimeSeconds()
                                             |> BigInteger
@@ -926,7 +926,8 @@ module Logic =
                     Some
                         { datetime = currentTime.DateTime
                           resolutionSeconds = (int) resolutionTime.TotalSeconds
-                          uniswapPairId = pairId
+                          token0Id = token0Id
+                          token1Id = token1Id
                           _open = candle._open.ToString()
                           high = candle.high.ToString()
                           low = candle.low.ToString()
@@ -945,7 +946,7 @@ module Logic =
         match candle with
         | Some candle ->
             callback (
-                $"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"
+                $"token0Id:{candle.token0Id}\ntoken1Id:{candle.token1Id}resolutionSeconds:{candle.resolutionSeconds}\n"
                 + $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"
                 + $"close:{candle.close}\nvolume:{candle.volume}"
             )
@@ -955,7 +956,8 @@ module Logic =
 
     let buildCandleSendCallbackAndWriteToDBAsync
         (resolutionTime: TimeSpan)
-        pairId
+        token0Id
+        token1Id
         callback
         (web3: Web3)
         (currentTime: DateTimeOffset)
@@ -967,11 +969,11 @@ module Logic =
                 resolutionTimeAgo.ToUnixTimeSeconds()
                 |> BigInteger
 
-            let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
+            let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix token0Id token1Id web3
             return! sendCallbackAndWriteToDB dbCandle currentTime resolutionTimeAgo callback
         }
 
-    let getCandle (pairId: string, callback, resolutionTime: TimeSpan, web3: Web3) =
+    let getCandle (token0Id, token1Id, callback, resolutionTime: TimeSpan, web3: Web3) =
         let timer =
             new Timer(resolutionTime.TotalMilliseconds)
 
@@ -979,7 +981,7 @@ module Logic =
             new ElapsedEventHandler(fun _ _ ->
                 DateTime.Now.ToUniversalTime()
                 |> DateTimeOffset
-                |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime pairId callback web3
+                |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime token0Id token1Id callback web3
                 |> Async.RunSynchronously)
 
         timer.Elapsed.AddHandler(candlesHandler)
@@ -991,14 +993,14 @@ module Logic =
     let firstUniswapExchangeTimestamp =
         DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
 
-    let getCandles (pairId, callback, resolutionTime: TimeSpan, web3: Web3) =
+    let getCandles (token0Id, token1Id, callback, resolutionTime: TimeSpan, web3: Web3) =
         let mutable currentTime = DateTime.Now.ToUniversalTime()
         //let mutable currentTime = (new DateTime(2018, 11, 2, 10, 34, 56)).ToUniversalTime()
 
         while currentTime >= firstUniswapExchangeTimestamp do
             currentTime
             |> DateTimeOffset
-            |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime pairId callback web3
+            |> buildCandleSendCallbackAndWriteToDBAsync resolutionTime token0Id token1Id callback web3
             |> Async.RunSynchronously
             currentTime <- currentTime.Subtract(resolutionTime)
         callback "Processing completed successfully"
@@ -1015,7 +1017,21 @@ let main args =
 
     let web3 =
         new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
+
+    let candle = {
+        datetime = new DateTime(2020, 9, 10)
+        resolutionSeconds = 10
+        token0Id = "ads"
+        token1Id = "asd"
+        _open = "1"
+        high ="3"
+        low = "1"
+        close = "2"
+        volume = (uint)5
+    }
+    //DB.addCandle candle |> Async.RunSynchronously
+    let v = DB.fetchCandles "ads" "asd" 10 |> Async.RunSynchronously
     
     //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandle
-    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
+    //(pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
     0

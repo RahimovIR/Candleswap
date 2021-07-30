@@ -138,11 +138,7 @@ namespace WebSocket.Uniswap.Infrastructure
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = arrayKeyParam[1] switch
-            {
-                "1m" => 60,
-                _ => 10
-            };
+            int resolution = GetResolution(arrayKeyParam[1]);
 
             if (arrayKeyParam.Length > 3)
             {
@@ -160,11 +156,7 @@ namespace WebSocket.Uniswap.Infrastructure
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = arrayKeyParam[1] switch
-            {
-                "1m" => 60,
-                _ => 10
-            };
+            int resolution = GetResolution(arrayKeyParam[1]);
             if (arrayKeyParam.Length > 3)
             {
                 CandleEvent.UnsubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], resolution);
@@ -175,6 +167,20 @@ namespace WebSocket.Uniswap.Infrastructure
             }
 
             ReceiveText?.Invoke(this, webSocketMessage);
+        }
+
+        private static int GetResolution(string arrayKeyParam)
+        {
+            return arrayKeyParam switch
+            {
+                "1h" => 3600,
+                "30m" => 1800,
+                "5m" => 300,
+                "1m" => 60,
+                "30s" => 30,
+                "10s" => 10,
+                _ => 10
+            };
         }
 
         #endregion

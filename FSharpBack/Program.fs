@@ -9,5 +9,6 @@ let main _ =
     let web3 =
         new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e")
     
-    (pairId, (fun c -> printfn "%A" c), resolutionTime, web3) |> Logic.getCandles
+    let connection = Db.connection Db.defaultConnectionString
+    Logic.getCandles connection (pairId, printfn "%A", resolutionTime, web3) 
     0

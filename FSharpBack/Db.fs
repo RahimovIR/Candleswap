@@ -1,17 +1,17 @@
 ﻿namespace RedDuck.Candleswap.Candles
 
+open System
 open System.Data.SQLite
 open System.Collections.Generic
 open Dapper
 open RedDuck.Candleswap.Candles.Types
 
 module Db =
+    
     let private databaseFilename = __SOURCE_DIRECTORY__ + @"\Database\candles.db"
+    let defaultConnectionString = sprintf "Data Source=%s;Version=3;" databaseFilename
 
-    let private connectionString = sprintf "Data Source=%s;Version=3;" databaseFilename
-
-    let private connection = new SQLiteConnection(connectionString)
-    do connection.Open()
+    let internal connection (connectionString: string) = new SQLiteConnection(connectionString)
 
     let private fetchCandlesSql = @"select datetime, resolutionSeconds, uniswapPairId, open as _open, high, low, close, volume from candles
         where uniswapPairId = @uniswapPairId and resolutionSeconds = @resolutionSeconds"
@@ -38,26 +38,25 @@ module Db =
 
     let private dbExecute (connection: SQLiteConnection) (sql: string) (data: _) = connection.ExecuteAsync(sql, data)
 
-    let fetchCandles (uniswapPairId: string) (resolutionSeconds: int) =
+    let fetchCandles connection (uniswapPairId: string) (resolutionSeconds: int) =
         async {
-            let! candles =
-                Async.AwaitTask
-                <| dbQuery<DbCandle>
-                    connection
-                    fetchCandlesSql
-                    (Some(
-                        dict [ "uniswapPairId" => uniswapPairId
-                               "resolutionSeconds" => resolutionSeconds ]
-                    ))
-
-            return candles
+            let query = dbQuery<DbCandle> connection fetchCandlesSql
+            let task = query ^ Some(dict [ 
+                "uniswapPairId" => uniswapPairId
+                "resolutionSeconds" => resolutionSeconds ])
+            try
+                let! candles = Async.AwaitTask task
+                return candles
+            with e -> 
+                raise e
+                return Seq.empty
         }
 
-    let fetchCandlesTask (uniswapPairId: string) (resolutionSeconds: int) =
+    let fetchCandlesTask connection (uniswapPairId: string) (resolutionSeconds: int) =
         Async.StartAsTask
-        <| fetchCandles uniswapPairId resolutionSeconds
+        <| fetchCandles connection uniswapPairId resolutionSeconds
 
-    let addCandle candle =
+    let addCandle connection candle =
         async {
             let! rowsChanged =
                 Async.AwaitTask
@@ -66,7 +65,7 @@ module Db =
             printfn "records added: %i" rowsChanged
         }
 
-    let updateCandle candle =
+    let updateCandle connection candle =
         async {
             let! rowsChanged =
                 Async.AwaitTask
@@ -75,7 +74,7 @@ module Db =
             printfn "records added: %i" rowsChanged
         }
 
-    let getCandleByDatetime datetime =
+    let getCandleByDatetime connection  datetime =
         async {
             let queryParams = Some <| dict [ "datetime" => datetime ]
 

@@ -1,15 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.FSharp.Control;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.FSharp.Core;
-using WebSocket.Uniswap.Infrastructure;
-using System.Threading;
+using Microsoft.AspNetCore.Mvc;
 using RedDuck.Candleswap.Candles;
+using RedDuck.Candleswap.Candles.CSharp;
 
 namespace WebSocket.Uniswap.Controllers
 {
@@ -17,7 +11,25 @@ namespace WebSocket.Uniswap.Controllers
     [ApiController]
     public class CandlesController : ControllerBase
     {
-        //curl -X GET "https://localhost:44359/api/Candles?symbol=0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc&periodSeconds=1800&startTime=1625121600&endTime=1625125519&limit=1" -H  "accept: */*"
+        private readonly ICandleStorageService candleStorage;
+
+        public CandlesController(ICandleStorageService candleStorage)
+        {
+            this.candleStorage = candleStorage;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="symbol"></param>
+        /// <param name="periodSeconds"></param>
+        /// <param name="startTime"></param>
+        /// <param name="endTime"></param>
+        /// <param name="limit"></param>
+        /// <returns></returns>
+        /// <example>
+        /// curl -X GET "https://localhost:44359/api/Candles?symbol=0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc&periodSeconds=1800&startTime=1625121600&endTime=1625125519&limit=1" -H  "accept: */*"
+        /// </example>
         [HttpGet()]
         public async Task<object> GetHistoricalCandles([FromQuery] string token0Id,
             [FromQuery] string token1Id,
@@ -44,10 +56,10 @@ namespace WebSocket.Uniswap.Controllers
                 : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;
             limit ??= 10;
 
-            var candles = await DB.fetchCandlesTask(token0Id, token1Id, periodSeconds);
+            var candles = await candleStorage.FetchCandlesAsync(token0Id, token1Id, periodSeconds);
 
-            return candles.Where(c => c.datetime >= startDateTime
-            && c.datetime <= endDateTime)
+            return candles
+                .Where(c => c.datetime >= startDateTime && c.datetime <= endDateTime)
                 .OrderByDescending(c => c.datetime)
                 .Take(limit.Value);
         }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using RedDuck.Candleswap.Candles.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,20 +12,21 @@ namespace WebSocket.Uniswap.Middlewares
 {
     internal class WebSocketConnectionsMiddleware
     {
-        #region Fields
-        private WebSocketConnectionsOptions _options;
-        private IWebSocketConnectionsService _connectionsService;
-        #endregion
+        private readonly WebSocketConnectionsOptions _options;
+        private readonly IWebSocketConnectionsService _connectionsService;
+        private readonly ILogicService _logic;
 
-        #region Constructor
-        public WebSocketConnectionsMiddleware(RequestDelegate next, WebSocketConnectionsOptions options, IWebSocketConnectionsService connectionsService)
+        public WebSocketConnectionsMiddleware(
+            RequestDelegate next, 
+            WebSocketConnectionsOptions options, 
+            IWebSocketConnectionsService connectionsService,
+            ILogicService logic)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _connectionsService = connectionsService ?? throw new ArgumentNullException(nameof(connectionsService));
+            _logic = logic;
         }
-        #endregion
 
-        #region Methods
         public async Task Invoke(HttpContext context)
         {
             if (context.WebSockets.IsWebSocketRequest)
@@ -50,7 +52,7 @@ namespace WebSocket.Uniswap.Middlewares
 
                     var cancelReceiveMessages = new CancellationTokenSource();
 
-                    await webSocketConnection.ReceiveMessagesUntilCloseAsync();
+                    await webSocketConnection.ReceiveMessagesUntilCloseAsync(_logic);
 
                     if (webSocketConnection.CloseStatus.HasValue)
                     {
@@ -77,6 +79,5 @@ namespace WebSocket.Uniswap.Middlewares
         {
             return (_options.AllowedOrigins == null) || (_options.AllowedOrigins.Count == 0) || (_options.AllowedOrigins.Contains(context.Request.Headers["Origin"].ToString()));
         }
-        #endregion
     }
 }

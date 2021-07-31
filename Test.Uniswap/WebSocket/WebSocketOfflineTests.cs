@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Nethereum.RPC.Eth.DTOs;
@@ -324,13 +323,15 @@ namespace Test.Uniswap
             List<(Transaction, TransactionReceipt)> transactionsWithReceipts,
             string tokenIn, string tokenOut)
         {
-            var computation = CSharp.Logic.PartlyBuildCandle(transactionsWithReceipts.ToArray(),
-                            tokenIn,
-                            tokenOut,
-                            new Candle(_open: 0, high: 0,
-                                low: BigDecimal.Parse(CSharp.Logic.MaxUInt256StringRepresentation),
-                                close: 0, volume: 0),
-                            wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
+            var computation =
+                Logic.partlyBuildCandle(
+                    transactionsWithReceipts.Select(x => Tuple.Create(x.Item1, x.Item2)).ToArray(),
+                    tokenIn,
+                    tokenOut,
+                    new Candle(_open: 0, high: 0,
+                        low: BigDecimal.Parse(RedDuck.Candleswap.Candles.CSharp.Logic.MaxUInt256StringRepresentation),
+                        close: 0, volume: 0),
+                    wasRequiredTransactionsInPeriodOfTime: true, firstIterFlag: true);
             Candle candle = computation.Item1;
             Console.WriteLine(candle);
             Assert.IsNotNull(candle);

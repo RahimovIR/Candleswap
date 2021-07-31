@@ -1,6 +1,7 @@
-﻿[<AutoOpen>]
-module internal RedDuck.Candleswap.Candles.Utils
+﻿namespace global
 
-let inline (^) f x = f x
+[<AutoOpen>]
+module Utils =
+    let inline (^) f x = f x
 
 

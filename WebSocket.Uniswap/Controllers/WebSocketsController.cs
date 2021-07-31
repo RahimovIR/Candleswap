@@ -10,7 +10,7 @@ namespace WebSocket.Uniswap.Controllers
         [HttpGet("/socket")]
         public async Task SendMessage([FromQuery] string message)
         {
-           
+
         }
     }
 }

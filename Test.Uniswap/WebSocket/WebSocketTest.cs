@@ -10,7 +10,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using Nethereum.Web3;
 using Newtonsoft.Json.Linq;
+using RedDuck.Candleswap.Candles.CSharp;
 using WebSocket.Uniswap;
 using WebSocket.Uniswap.Infrastructure;
 
@@ -20,6 +23,13 @@ namespace Test.Uniswap
     public class WebSocketTest
     {
         private const string webSocketURL = "wss://localhost:5001/socket";
+        private readonly LogicService logic;
+
+        public WebSocketTest()
+        {
+            var web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
+            logic = new LogicService(web3, Mock.Of<ISQLiteConnectionProvider>());
+        }
 
         [TestMethod]
         public async Task GetCandles_PassWhenAny()
@@ -30,16 +40,16 @@ namespace Test.Uniswap
 
             var responseList = new List<string>();
             CandleEvent.SubscribeCandles(
+                logic,
                 pairId,
-                     pairId,
-                     c =>
-                     {
-                         Console.WriteLine(c);
-                         responseList.Add(c);
-                         // stop waiting if a response came
-                         cancelDelay.Cancel();
-                     },
-                     (int)resolutionTime.TotalSeconds);
+                c =>
+                {
+                    Console.WriteLine(c);
+                    responseList.Add(c);
+                    // stop waiting if a response came
+                    cancelDelay.Cancel();
+                },
+                (int)resolutionTime.TotalSeconds);
 
             try
             {
@@ -66,20 +76,20 @@ namespace Test.Uniswap
 
             var candlesList = new List<string>();
             CandleEvent.SubscribeCandles(
-                     pairId, 
-                     pairId,
-                     c =>
-                     {
-                         Console.WriteLine(c);
-                         if (c.Contains("_open"))
-                         {
-                             candlesList.Add(c);
+                logic,
+                pairId,
+                c =>
+                {
+                    Console.WriteLine(c);
+                    if (c.Contains("_open"))
+                    {
+                        candlesList.Add(c);
 
-                             // stop waiting if a response came
-                             cancelDelay.Cancel();
-                         }
-                     },
-                     (int)resolutionTime.TotalSeconds);
+                        // stop waiting if a response came
+                        cancelDelay.Cancel();
+                    }
+                },
+                (int)resolutionTime.TotalSeconds);
 
             TimeSpan delay = TimeSpan.FromMinutes(5);
 
@@ -107,16 +117,16 @@ namespace Test.Uniswap
 
             var responseList = new List<string>();
             CandleEvent.SubscribeHistoricalCandles(
+                logic,
                 pairId,
-                     pairId,
-                     c =>
-                     {
-                         Console.WriteLine(c);
-                         responseList.Add(c);
-                         // stop waiting if a response came
-                         cancelDelay.Cancel();
-                     },
-                     (int)resolutionTime.TotalSeconds);
+                c =>
+                {
+                    Console.WriteLine(c);
+                    responseList.Add(c);
+                    // stop waiting if a response came
+                    cancelDelay.Cancel();
+                },
+                (int)resolutionTime.TotalSeconds);
 
             try
             {
@@ -143,20 +153,20 @@ namespace Test.Uniswap
 
             var candlesList = new List<string>();
             CandleEvent.SubscribeHistoricalCandles(
-                     pairId,
-                     pairId,
-                     c =>
-                     {
-                         Console.WriteLine(c);
-                         if (c.Contains("_open"))
-                         {
-                             candlesList.Add(c);
+                logic,
+                pairId,
+                c =>
+                {
+                    Console.WriteLine(c);
+                    if (c.Contains("_open"))
+                    {
+                        candlesList.Add(c);
 
-                             // stop waiting if a response came
-                             cancelDelay.Cancel();
-                         }
-                     },
-                     (int)resolutionTime.TotalSeconds);
+                        // stop waiting if a response came
+                        cancelDelay.Cancel();
+                    }
+                },
+                (int)resolutionTime.TotalSeconds);
 
             try
             {
@@ -242,38 +252,31 @@ namespace Test.Uniswap
             int actualCounterUniswapHeartbeat = 0;
             int expectedCounterUniswapHeartbeat = 10;
 
-            try
-            {
-                var client = await CreateConnectWithLocalWebSocket();
+            var client = await CreateConnectWithLocalWebSocket();
 
-                while (!isCompleted)
+            while (!isCompleted)
+            {
+                var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+                if (result.MessageType == WebSocketMessageType.Text)
                 {
-                    var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                    var webSocketMessage = Encoding.UTF8.GetString(buffer, 0, result.Count).TrimEnd('\0');
+                    actualCounterUniswapHeartbeat = webSocketMessage == "Uniswap Heartbeat" ? ++actualCounterUniswapHeartbeat : actualCounterUniswapHeartbeat;
 
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        var webSocketMessage = Encoding.UTF8.GetString(buffer, 0, result.Count).TrimEnd('\0');
-                        actualCounterUniswapHeartbeat = webSocketMessage == "Uniswap Heartbeat" ? ++actualCounterUniswapHeartbeat : actualCounterUniswapHeartbeat;
+                    Assert.AreEqual("Uniswap Heartbeat", webSocketMessage);
 
-                        Assert.AreEqual("Uniswap Heartbeat", webSocketMessage);
-
-                        if (actualCounterUniswapHeartbeat >= 10)
-                            isCompleted = true;
-                    }
-                    else if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        await client.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-                        break;
-                    }
+                    if (actualCounterUniswapHeartbeat >= 10)
+                        isCompleted = true;
                 }
+                else if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await client.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                    break;
+                }
+            }
 
-                Assert.AreEqual(expectedCounterUniswapHeartbeat, actualCounterUniswapHeartbeat);
-                Assert.IsTrue(isCompleted);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
+            Assert.AreEqual(expectedCounterUniswapHeartbeat, actualCounterUniswapHeartbeat);
+            Assert.IsTrue(isCompleted);
         }
 
         [TestMethod]
@@ -285,7 +288,6 @@ namespace Test.Uniswap
             var response = await client.GetAsync("https://localhost:5001/api/Candles?" +
                 $"symbol={pairId}" +
                 $"&periodSeconds={period}");
-
             response.EnsureSuccessStatusCode();
             var responseToken = JToken.Parse(await response.Content.ReadAsStringAsync());
             Console.WriteLine(responseToken);

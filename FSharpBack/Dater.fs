@@ -13,7 +13,7 @@ module Dater =
 
     let getBlockNumberAndTimestampAsync
         (savedBlocks: Dictionary<HexBigInteger, HexBigInteger>)
-        (web3: Web3)
+        (web3: IWeb3)
         (blockNumber: HexBigInteger)
         =
         async {
@@ -106,7 +106,7 @@ module Dater =
                     findBestBlock date nextPredictedBlock ifBlockAfterDate newBlockTime savedBlocks checkedBlocks web3
         }
 
-    let getBlockByDateAsync ifBlockAfterDate (web3: Web3) date =
+    let getBlockByDateAsync ifBlockAfterDate (web3: IWeb3) date =
         async {
             let savedBlocks =
                 new Dictionary<HexBigInteger, HexBigInteger>()

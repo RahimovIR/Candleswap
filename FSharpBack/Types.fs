@@ -16,7 +16,8 @@ module Types =
     type DbCandle =
         { datetime: DateTime
           resolutionSeconds: int
-          uniswapPairId: string
+          token0Id: string
+          token1Id: string
           _open: string
           high: string
           low: string

@@ -42,6 +42,7 @@ namespace Test.Uniswap
             CandleEvent.SubscribeCandles(
                 logic,
                 pairId,
+                pairId,
                 c =>
                 {
                     Console.WriteLine(c);
@@ -77,6 +78,7 @@ namespace Test.Uniswap
             var candlesList = new List<string>();
             CandleEvent.SubscribeCandles(
                 logic,
+                pairId,
                 pairId,
                 c =>
                 {
@@ -119,6 +121,7 @@ namespace Test.Uniswap
             CandleEvent.SubscribeHistoricalCandles(
                 logic,
                 pairId,
+                pairId,
                 c =>
                 {
                     Console.WriteLine(c);
@@ -154,6 +157,7 @@ namespace Test.Uniswap
             var candlesList = new List<string>();
             CandleEvent.SubscribeHistoricalCandles(
                 logic,
+                pairId,
                 pairId,
                 c =>
                 {

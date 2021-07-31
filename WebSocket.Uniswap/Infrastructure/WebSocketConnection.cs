@@ -85,7 +85,7 @@ namespace WebSocket.Uniswap.Infrastructure
                             }
                             else if (webSocketMessage.Contains("unsubscribe"))
                             {
-                                OnReceiveCandlesUnsubscribeRequest(logic, webSocketMessage);
+                                OnReceiveCandlesUnsubscribeRequest(webSocketMessage);
                             }
                         }
                         else

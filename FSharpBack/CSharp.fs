@@ -36,7 +36,8 @@ type ILogicService =
         Candle * bool * bool
 
     abstract GetCandle:
-        paidId: string ->
+        token0Id: string ->
+        token1Id: string ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         unit
@@ -61,9 +62,9 @@ type LogicService(web3: IWeb3, sqlite: ISQLiteConnectionProvider) =
                 wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag
         
-        member _.GetCandle paidId callback resolutionTime =
+        member _.GetCandle token0Id token1Id callback resolutionTime =
             let callback str = callback.Invoke(str)
-            Logic.getCandle connection paidId callback resolutionTime web3
+            Logic.getCandle connection token0Id token1Id callback resolutionTime web3
 
 module Logic =
     [<Literal>]
@@ -72,7 +73,11 @@ module Logic =
 type ICandleStorageService =
     abstract UpdateCandleAsync: Candle -> Task
     abstract AddCandleAsync: Candle -> Task
-    abstract FetchCandlesAsync: uniswapPairId: string -> resolutionSeconds: int -> Task<seq<DbCandle>>
+    abstract FetchCandlesAsync: 
+        token0Id: string -> 
+        token1Id: string -> 
+        resolutionSeconds: int -> 
+        Task<seq<DbCandle>>
     
 type CandleStorageService(sqlite: ISQLiteConnectionProvider) =
     let connection = sqlite.GetConnection()
@@ -84,5 +89,5 @@ type CandleStorageService(sqlite: ISQLiteConnectionProvider) =
         member _.AddCandleAsync candle = 
             Db.addCandle connection candle |> Async.StartAsTask :> Task
         
-        member _.FetchCandlesAsync unswapPairId resolutionSeconds = 
-            Db.fetchCandles connection unswapPairId resolutionSeconds |> Async.StartAsTask
+        member _.FetchCandlesAsync token0Id token1Id resolutionSeconds = 
+            Db.fetchCandles connection token0Id token1Id resolutionSeconds |> Async.StartAsTask

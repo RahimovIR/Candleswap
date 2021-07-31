@@ -21,9 +21,7 @@ module Logic =
         token1Id
         (candle: Candle)
         wasRequiredTransactionsInPeriodOfTime
-        firstIterFlag
-        =
-
+        firstIterFlag =
         let tryGetTransactionInfo addresses infoFunc (transaction: Transaction) =
             if List.contains transaction.To addresses 
             then Some infoFunc
@@ -77,7 +75,8 @@ module Logic =
         (currentTime: DateTimeOffset)
         (resolutionTime: TimeSpan)
         resolutionTimeAgoUnix
-        pairId
+        token0Id
+        token1Id
         (web3: IWeb3)
         =
 
@@ -99,10 +98,6 @@ module Logic =
                     r.Status.Value <> 0I)
 
         async {
-            let pair = Requests.takePoolInfo(pairId).Value
-            let token0Id = pair.token0Id
-            let token1Id = pair.token1Id
-            //try
             let! initializableBlockNumber = currentTime.ToUnixTimeSeconds()
                                             |> BigInteger
                                             |> Dater.getBlockByDateAsync false web3
@@ -171,7 +166,8 @@ module Logic =
                     Some
                         { datetime = currentTime.DateTime
                           resolutionSeconds = (int) resolutionTime.TotalSeconds
-                          uniswapPairId = pairId
+                          token0Id = token0Id
+                          token1Id = token1Id
                           _open = candle._open.ToString()
                           high = candle.high.ToString()
                           low = candle.low.ToString()
@@ -183,11 +179,16 @@ module Logic =
             return dbCandle
         }
 
-    let sendCallbackAndWriteToDB connection candle (currentTime: DateTimeOffset) (resolutionTimeAgo: DateTimeOffset) callback =
+    let sendCallbackAndWriteToDB 
+        connection 
+        (candle: DbCandle option) 
+        (currentTime: DateTimeOffset) 
+        (resolutionTimeAgo: DateTimeOffset) 
+        callback =
         match candle with
         | Some candle ->
             callback (
-                $"uniswapPairId:{candle.uniswapPairId}\nresolutionSeconds:{candle.resolutionSeconds}\n"
+                $"token0Id:{candle.token0Id}\ntoken1Id:{candle.token1Id}\nresolutionSeconds:{candle.resolutionSeconds}\n"
                 + $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"
                 + $"close:{candle.close}\nvolume:{candle.volume}"
             )
@@ -198,7 +199,8 @@ module Logic =
     let buildCandleSendCallbackAndWriteToDBAsync
         connection
         (resolutionTime: TimeSpan)
-        pairId
+        token0Id
+        token1Id
         callback
         (web3: IWeb3)
         (currentTime: DateTimeOffset)
@@ -210,11 +212,11 @@ module Logic =
                 resolutionTimeAgo.ToUnixTimeSeconds()
                 |> BigInteger
 
-            let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix pairId web3
+            let! dbCandle = buildCandleAsync currentTime resolutionTime resolutionTimeAgoUnix token0Id token1Id web3
             return! sendCallbackAndWriteToDB connection dbCandle currentTime resolutionTimeAgo callback
         }
 
-    let getCandle connection (pairId: string) callback (resolutionTime: TimeSpan) (web3: IWeb3) =
+    let getCandle connection token0Id token1Id callback (resolutionTime: TimeSpan) (web3: IWeb3) =
         let timer =
             new Timer(resolutionTime.TotalMilliseconds)
 
@@ -222,7 +224,7 @@ module Logic =
             new ElapsedEventHandler(fun _ _ ->
                 DateTime.Now.ToUniversalTime()
                 |> DateTimeOffset
-                |> buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pairId callback web3
+                |> buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime token0Id token1Id callback web3
                 |> Async.RunSynchronously)
 
         timer.Elapsed.AddHandler(candlesHandler)
@@ -239,12 +241,12 @@ module Logic =
         if a >= b then []
         else DateTimeOffset a :: getTimeSamples (a.Add rate, b) rate
 
-    let getCandles connection (pairId, callback, resolutionTime: TimeSpan, web3: Web3) =
+    let getCandles connection (token0Id, token1Id, callback, resolutionTime: TimeSpan, web3: Web3) =
         let b = DateTime.Now.ToUniversalTime()
         let a = firstUniswapExchangeTimestamp
         for t in getTimeSamples (a, b) resolutionTime do
             buildCandleSendCallbackAndWriteToDBAsync 
-                connection resolutionTime pairId callback web3 t
+                connection resolutionTime token0Id token1Id callback web3 t
             |> Async.RunSynchronously
         
         callback "Processing completed successfully"

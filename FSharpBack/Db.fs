@@ -6,26 +6,20 @@ open System.Collections.Generic
 open Dapper
 open RedDuck.Candleswap.Candles.Types
 
-module Db =
-    
-    let private databaseFilename = __SOURCE_DIRECTORY__ + @"\Database\candles.db"
-    let defaultConnectionString = sprintf "Data Source=%s;Version=3;" databaseFilename
-
-    let internal connection (connectionString: string) = new SQLiteConnection(connectionString)
-
-    let private fetchCandlesSql = @"select datetime, resolutionSeconds, uniswapPairId, open as _open, high, low, close, volume from candles
-        where uniswapPairId = @uniswapPairId and resolutionSeconds = @resolutionSeconds"
+module Db = 
+    let private fetchCandlesSql = @"select datetime, resolutionSeconds, token0Id, token1Id, open as _open, high, low, close, volume from candles
+        where token0Id = @token0Id and token1Id = @token1Id and resolutionSeconds = @resolutionSeconds"
 
     let private insertCandleSql =
-        "insert into candles(datetime, resolutionSeconds, uniswapPairId, open, high, low, close, volume) "
-        + "values (@datetime, @resolutionSeconds, @uniswapPairId, @_open, @high, @low, @close, @volume)"
+        "insert into candles(datetime, resolutionSeconds, token0Id, token1Id, open, high, low, close, volume) "
+        + "values (@datetime, @resolutionSeconds, @token0Id, @token1Id, @_open, @high, @low, @close, @volume)"
 
     let private updateCandleSql =
-        "update candles set open = @_open, high = @high, low = @low, close = @close, volume = @volume) "
-        + "values uniswapPairId = @uniswapPairId and resolutionSeconds = @resolutionSeconds and datetime = @datetime)"
+        "update candles set open = @_open, high = @high, low = @low, close = @close, volume = @volume "
+        + "where token0Id = @token0Id and token1Id = @token1Id and resolutionSeconds = @resolutionSeconds and datetime = @datetime"
 
     let private getCandleByDatetimeSql =
-        "select datetime, resolutionSeconds, uniswapPairId, open, high, low, close, volume"
+        "select datetime, resolutionSeconds, token0Id, token1Id, open, high, low, close, volume"
         + "from candles"
         + "where datetime = @datetime"
 
@@ -38,23 +32,25 @@ module Db =
 
     let private dbExecute (connection: SQLiteConnection) (sql: string) (data: _) = connection.ExecuteAsync(sql, data)
 
-    let fetchCandles connection (uniswapPairId: string) (resolutionSeconds: int) =
+    let fetchCandles connection (token0Id: string) (token1Id:string) (resolutionSeconds: int) =
         async {
-            let query = dbQuery<DbCandle> connection fetchCandlesSql
-            let task = query ^ Some(dict [ 
-                "uniswapPairId" => uniswapPairId
-                "resolutionSeconds" => resolutionSeconds ])
-            try
-                let! candles = Async.AwaitTask task
-                return candles
-            with e -> 
-                raise e
-                return Seq.empty
+            let! candles =
+                Async.AwaitTask
+                <| dbQuery<DbCandle>
+                    connection
+                    fetchCandlesSql
+                    (Some(
+                        dict [ "token0Id" => token0Id
+                               "token1Id" => token1Id
+                               "resolutionSeconds" => resolutionSeconds ]
+                    ))
+
+            return candles
         }
 
-    let fetchCandlesTask connection (uniswapPairId: string) (resolutionSeconds: int) =
-        Async.StartAsTask
-        <| fetchCandles connection uniswapPairId resolutionSeconds
+    let fetchCandlesTask connection (token0Id: string) (token1Id:string) (resolutionSeconds: int) =
+        fetchCandles connection token0Id token1Id resolutionSeconds
+        |> Async.StartAsTask
 
     let addCandle connection candle =
         async {
@@ -74,7 +70,7 @@ module Db =
             printfn "records added: %i" rowsChanged
         }
 
-    let getCandleByDatetime connection  datetime =
+    let getCandleByDatetime connection datetime =
         async {
             let queryParams = Some <| dict [ "datetime" => datetime ]
 

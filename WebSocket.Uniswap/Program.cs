@@ -20,7 +20,16 @@ namespace WebSocket.Uniswap
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
+                    //webBuilder.UseConfiguration(GetConfiguration());
                     webBuilder.UseStartup<Startup>();
                 });
+
+        private static IConfigurationRoot GetConfiguration()
+        {
+            var config = new ConfigurationBuilder()
+                .AddUserSecrets<Startup>()
+                .Build();
+            return config;
+        }
     }
 }

@@ -7,42 +7,33 @@ using System.Threading;
 using System.Text;
 using Newtonsoft.Json;
 using WebSocket.Uniswap.Models;
+using RedDuck.Candleswap.Candles.CSharp;
 
 namespace WebSocket.Uniswap.Infrastructure
 {
     internal class WebSocketConnection
     {
-        #region Fields
         private System.Net.WebSockets.WebSocket _webSocket;
         private int _receivePayloadBufferSize;
-        #endregion
 
-        #region Properties
         public Guid Id { get; } = Guid.NewGuid();
 
         public WebSocketCloseStatus? CloseStatus { get; private set; } = null;
 
         public string CloseStatusDescription { get; private set; } = null;
-        #endregion
 
-        #region Events
         public event EventHandler<string> ReceiveText;
 
         public event EventHandler<byte[]> ReceiveBinary;
 
         public event EventHandler<string> ReceiveCandleUpdate;
 
-        #endregion
-
-        #region Constructor
         public WebSocketConnection(System.Net.WebSockets.WebSocket webSocket, int receivePayloadBufferSize)
         {
             _webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
             _receivePayloadBufferSize = receivePayloadBufferSize;
         }
-        #endregion
 
-        #region Methods
         public Task SendAsync(string message, CancellationToken cancellationToken)
         {
             return _webSocket.SendAsync(buffer: new ArraySegment<byte>(array: Encoding.ASCII.GetBytes(message),
@@ -61,7 +52,7 @@ namespace WebSocket.Uniswap.Infrastructure
                                         cancellationToken: cancellationToken);
         }
 
-        public async Task ReceiveMessagesUntilCloseAsync()
+        public async Task ReceiveMessagesUntilCloseAsync(ILogicService logic)
         {
             try
             {
@@ -90,7 +81,7 @@ namespace WebSocket.Uniswap.Infrastructure
                         {
                             if (webSocketMessage.Contains("subscribe"))
                             {
-                                OnReceiveCandlesSubscribeRequest(webSocketMessage);
+                                OnReceiveCandlesSubscribeRequest(logic, webSocketMessage);
                             }
                             else if (webSocketMessage.Contains("unsubscribe"))
                             {
@@ -134,7 +125,7 @@ namespace WebSocket.Uniswap.Infrastructure
             ReceiveCandleUpdate?.Invoke(this, candle);
         }
 
-        private void OnReceiveCandlesSubscribeRequest(string webSocketMessage)
+        private void OnReceiveCandlesSubscribeRequest(ILogicService logic, string webSocketMessage)
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
@@ -142,7 +133,7 @@ namespace WebSocket.Uniswap.Infrastructure
 
             if (arrayKeyParam.Length > 3)
             {
-                CandleEvent.SubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);
+                CandleEvent.SubscribeCandles(logic, arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);
             }
             else
             {
@@ -182,7 +173,5 @@ namespace WebSocket.Uniswap.Infrastructure
                 _ => 10
             };
         }
-
-        #endregion
     }
 }

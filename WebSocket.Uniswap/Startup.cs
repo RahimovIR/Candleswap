@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
+using Nethereum.Web3;
+using RedDuck.Candleswap.Candles.CSharp;
 using System.Collections.Generic;
 using WebSocket.Uniswap.Middlewares;
 using WebSocket.Uniswap.Services;
@@ -26,6 +28,13 @@ namespace WebSocket.Uniswap
             services.AddWebSocketConnections();
 
             services.AddSingleton<IHostedService, HeartbeatService>();
+
+            services.AddSingleton<ISQLiteConnectionProvider, SQLiteConnectionProvider>();
+            services.AddTransient<ILogicService, LogicService>();
+            services.AddSingleton<IWeb3>(
+                new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e"));
+
+            services.AddTransient<ICandleStorageService, CandleStorageService>();
 
             services.AddSwaggerGen(c =>
             {

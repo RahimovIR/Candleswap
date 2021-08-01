@@ -11,4 +11,5 @@ build:
         - cd WebSocket.Uniswap
         - dotnet publish --no-restore -c Release -o /app/publish
     artifacts:
-        paths: /app/publish
+        paths: 
+            - /app/publish

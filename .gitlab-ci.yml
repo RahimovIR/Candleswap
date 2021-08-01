@@ -1,0 +1,14 @@
+image: mcr.microsoft.com/dotnet/sdk:5.0
+
+stages:
+    - build
+
+build:
+    stage: build
+    before_script:
+        - dotnet restore
+    script:
+        - cd WebSocket.Uniswap
+        - dotnet publish --no-restore -c Release -o /app/publish
+    artifacts:
+        paths: /app/publish

@@ -118,7 +118,7 @@ module Dater =
                 |> Async.AwaitTask
 
             let! latestBlock = getBlockNumberAndTimestampAsync savedBlocks web3 latestBlockNumber
-            let firstBlockNumber = HexBigInteger 1I
+            let firstBlockNumber = HexBigInteger 0I
             let! firstBlock = getBlockNumberAndTimestampAsync savedBlocks web3 firstBlockNumber
 
             let blockTime =

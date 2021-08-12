@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="db_creation.sql" />
     <Compile Include="Utils.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Requests.fs" />
@@ -18,6 +19,8 @@
     <Compile Include="CSharp.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.0.78" />

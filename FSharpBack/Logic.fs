@@ -46,9 +46,11 @@ module Logic =
             |> Array.filter (fun (inAddr, outAddr, _, _) -> (inAddr, outAddr) = (token0Id, token1Id))
 
         let currentPrice (_, _, amountIn, amountOut) = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
-
-        let openPrice = (Array.last >> currentPrice) actualTransactionsData
-        let closePrice = (Array.head >> currentPrice) actualTransactionsData
+        
+        let openPrice = if actualTransactionsData.Length > 0 then (Array.last >> currentPrice) actualTransactionsData
+                        else candle._open
+        let closePrice = if actualTransactionsData.Length > 0 then (Array.head >> currentPrice) actualTransactionsData
+                         else candle.close
 
         let high, low, volume = 
             let folder (high, low, volume) price =
@@ -172,7 +174,7 @@ module Logic =
                           high = candle.high.ToString()
                           low = candle.low.ToString()
                           close = candle.close.ToString()
-                          volume = candle.volume }
+                          volume = (int)candle.volume }
                 else
                     None
 
@@ -236,12 +238,15 @@ module Logic =
     let firstUniswapExchangeTimestamp =
         DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
 
-    let rec getTimeSamples (period: DateTime * DateTime) rate =
-        let a, b = period
-        if a >= b then []
-        else DateTimeOffset a :: getTimeSamples (a.Add rate, b) rate
+    let getTimeSamples (period: DateTime * DateTime) rate =
+        let rec inner (a: DateTime, b) samples =
+            if a >= b then 
+                samples
+            else
+                inner (a.Add rate, b) (DateTimeOffset a :: samples)
+        inner period []
 
-    let getCandles connection (token0Id, token1Id, callback, resolutionTime: TimeSpan, web3: Web3) =
+    let getCandles connection token0Id token1Id callback (resolutionTime: TimeSpan) (web3: IWeb3) =
         let b = DateTime.Now.ToUniversalTime()
         let a = firstUniswapExchangeTimestamp
         for t in getTimeSamples (a, b) resolutionTime do

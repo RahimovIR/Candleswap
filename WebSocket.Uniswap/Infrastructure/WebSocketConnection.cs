@@ -77,7 +77,7 @@ namespace WebSocket.Uniswap.Infrastructure
                         {
                             OnReceivePingPong(webSocketMessage);
                         }
-                        else if (webSocketMessage.Contains("candles"))
+                        else if (webSocketMessage.Contains("candles") || webSocketMessage.Contains("historicalCandles"))
                         {
                             if (webSocketMessage.Contains("subscribe"))
                             {
@@ -133,7 +133,10 @@ namespace WebSocket.Uniswap.Infrastructure
 
             if (arrayKeyParam.Length > 3)
             {
-                CandleEvent.SubscribeCandles(logic, arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);
+                if (webSocketRequest.Channel == "historicalCandles")
+                    CandleEvent.SubscribeHistoricalCandles(logic, arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);
+                else if (webSocketRequest.Channel == "candles")
+                    CandleEvent.SubscribeCandles(logic, arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);           
             }
             else
             {
@@ -150,7 +153,8 @@ namespace WebSocket.Uniswap.Infrastructure
             int resolution = GetResolution(arrayKeyParam[1]);
             if (arrayKeyParam.Length > 3)
             {
-                CandleEvent.UnsubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], resolution);
+                if (webSocketRequest.Channel == "historicalCandles" || webSocketRequest.Channel == "candles")
+                    CandleEvent.UnsubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], resolution);
             }
             else
             {

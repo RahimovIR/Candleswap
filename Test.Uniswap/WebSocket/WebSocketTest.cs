@@ -28,7 +28,7 @@ namespace Test.Uniswap
         public WebSocketTest()
         {
             var web3 = new Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
-            logic = new LogicService(web3, Mock.Of<ISQLiteConnectionProvider>());
+            logic = new LogicService(web3, Mock.Of<ISqlConnectionProvider>());
         }
 
         [TestMethod]

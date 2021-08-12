@@ -60,7 +60,7 @@ namespace WebSocket.Uniswap.Infrastructure
             var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
 
             Task.Run(() =>
-                logic.GetCandle(token0Id, token1Id, onCandle, TimeSpan.FromSeconds(resolutionSeconds)), 
+                logic.GetCandles(token0Id, token1Id, onCandle, TimeSpan.FromSeconds(resolutionSeconds)), 
                 cancelToken.Token);
         }
 

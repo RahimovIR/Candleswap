@@ -22,7 +22,7 @@ module Types =
           high: string
           low: string
           close: string
-          volume: uint }
+          volume: int }
 
     type Swap =
         { id: string

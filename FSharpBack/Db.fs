@@ -1,36 +1,36 @@
 ﻿namespace RedDuck.Candleswap.Candles
 
 open System
-open System.Data.SQLite
 open System.Collections.Generic
 open Dapper
 open RedDuck.Candleswap.Candles.Types
+open System.Data.SqlClient
 
 module Db = 
-    let private fetchCandlesSql = @"select datetime, resolutionSeconds, token0Id, token1Id, open as _open, high, low, close, volume from candles
+    let private fetchCandlesSql = @"select datetime, resolutionSeconds, token0Id, token1Id, [open] as _open, high, low, [close], volume from candles
         where token0Id = @token0Id and token1Id = @token1Id and resolutionSeconds = @resolutionSeconds"
 
     let private insertCandleSql =
-        "insert into candles(datetime, resolutionSeconds, token0Id, token1Id, open, high, low, close, volume) "
+        "insert into candles(datetime, resolutionSeconds, token0Id, token1Id, [open], high, low, [close], volume) "
         + "values (@datetime, @resolutionSeconds, @token0Id, @token1Id, @_open, @high, @low, @close, @volume)"
 
     let private updateCandleSql =
-        "update candles set open = @_open, high = @high, low = @low, close = @close, volume = @volume "
+        "update candles set [open] = @_open, high = @high, low = @low, [close] = @close, volume = @volume "
         + "where token0Id = @token0Id and token1Id = @token1Id and resolutionSeconds = @resolutionSeconds and datetime = @datetime"
 
     let private getCandleByDatetimeSql =
-        "select datetime, resolutionSeconds, token0Id, token1Id, open, high, low, close, volume"
+        "select datetime, resolutionSeconds, token0Id, token1Id, [open], high, low, [close], volume"
         + "from candles"
         + "where datetime = @datetime"
 
     let inline (=>) k v = k, box v
 
-    let private dbQuery<'T> (connection: SQLiteConnection) (sql: string) (parameters: IDictionary<string, obj> option) =
+    let private dbQuery<'T> (connection: SqlConnection) (sql: string) (parameters: IDictionary<string, obj> option) =
         match parameters with
         | Some (p) -> connection.QueryAsync<'T>(sql, p)
         | None -> connection.QueryAsync<'T>(sql)
 
-    let private dbExecute (connection: SQLiteConnection) (sql: string) (data: _) = connection.ExecuteAsync(sql, data)
+    let private dbExecute (connection: SqlConnection) (sql: string) (data: _) = connection.ExecuteAsync(sql, data)
 
     let fetchCandles connection (token0Id: string) (token1Id:string) (resolutionSeconds: int) =
         async {

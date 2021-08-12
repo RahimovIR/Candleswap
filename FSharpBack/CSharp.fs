@@ -3,22 +3,22 @@ namespace RedDuck.Candleswap.Candles.CSharp
 
 open System
 open System.Threading.Tasks
-open System.Data.SQLite
 open Microsoft.Extensions.Configuration
 open Nethereum.RPC.Eth.DTOs
 open Nethereum.Web3;
 open RedDuck.Candleswap.Candles
 open RedDuck.Candleswap.Candles.Types
+open System.Data.SqlClient
 
-type ISQLiteConnectionProvider =
-    abstract GetConnection: unit -> SQLiteConnection
+type ISqlConnectionProvider =
+    abstract GetConnection: unit -> SqlConnection
 
-type SQLiteConnectionProvider(config: IConfiguration) =
-    let connectionString = config.GetSection("ConnectionStrings").["Candles"]
-    let connection = new SQLiteConnection(connectionString)
+type SqlConnectionProvider(config: IConfiguration) =
+    let connectionString = config.GetSection("ConnectionStrings").["Default"]
+    let connection = new SqlConnection(connectionString)
     do connection.Open()
     
-    interface ISQLiteConnectionProvider with
+    interface ISqlConnectionProvider with
         member _.GetConnection() = connection
     
     interface IDisposable with
@@ -42,7 +42,14 @@ type ILogicService =
         resolutionTime: TimeSpan ->
         unit
 
-type LogicService(web3: IWeb3, sqlite: ISQLiteConnectionProvider) = 
+    abstract GetCandles:
+        token0Id: string ->
+        token1Id: string -> 
+        callback: Action<string> ->
+        resolutionTime: TimeSpan ->
+        unit
+
+type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) = 
     let toRefTuple = fun struct (a, b) -> (a, b)
     let connection = sqlite.GetConnection()
 
@@ -66,6 +73,10 @@ type LogicService(web3: IWeb3, sqlite: ISQLiteConnectionProvider) =
             let callback str = callback.Invoke(str)
             Logic.getCandle connection token0Id token1Id callback resolutionTime web3
 
+        member _.GetCandles token0Id token1Id callback resolutionTime = 
+            let callback str = callback.Invoke(str)
+            Logic.getCandles connection token0Id token1Id callback resolutionTime web3
+
 module Logic =
     [<Literal>]
     let MaxUInt256StringRepresentation = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
@@ -79,7 +90,7 @@ type ICandleStorageService =
         resolutionSeconds: int -> 
         Task<seq<DbCandle>>
     
-type CandleStorageService(sqlite: ISQLiteConnectionProvider) =
+type CandleStorageService(sqlite: ISqlConnectionProvider) =
     let connection = sqlite.GetConnection()
     
     interface ICandleStorageService with

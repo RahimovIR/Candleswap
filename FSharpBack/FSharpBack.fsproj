@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="db_creation.sql" />
     <Compile Include="Utils.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Requests.fs" />

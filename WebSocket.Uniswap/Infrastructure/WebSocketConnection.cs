@@ -79,14 +79,10 @@ namespace WebSocket.Uniswap.Infrastructure
                         }
                         else if (webSocketMessage.Contains("candles") || webSocketMessage.Contains("historicalCandles"))
                         {
-                            if (webSocketMessage.Contains("subscribe"))
-                            {
-                                OnReceiveCandlesSubscribeRequest(logic, webSocketMessage);
-                            }
-                            else if (webSocketMessage.Contains("unsubscribe"))
-                            {
+                            if(webSocketMessage.Contains("unsubscribe"))
                                 OnReceiveCandlesUnsubscribeRequest(webSocketMessage);
-                            }
+                            else if(webSocketMessage.Contains("subscribe"))
+                                OnReceiveCandlesSubscribeRequest(logic, webSocketMessage);
                         }
                         else
                             OnReceiveText(webSocketMessage);

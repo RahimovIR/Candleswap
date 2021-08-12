@@ -48,9 +48,9 @@ namespace WebSocket.Uniswap
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebSocket.Uniswap v1"));
             }
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebSocket.Uniswap v1"));
 
             WebSocketConnectionsOptions webSocketConnectionsOptions = new WebSocketConnectionsOptions
             {

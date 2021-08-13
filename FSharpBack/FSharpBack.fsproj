@@ -8,7 +8,6 @@
   <ItemGroup>
     <Compile Include="Utils.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="Requests.fs" />
     <Compile Include="Db.fs" />
     <Compile Include="Dater.fs" />
     <Compile Include="SwapRouterV3.fs" />

@@ -36,15 +36,13 @@ type ILogicService =
         Candle * bool * bool
 
     abstract GetCandle:
-        token0Id: string ->
-        token1Id: string ->
+        pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         unit
 
     abstract GetCandles:
-        token0Id: string ->
-        token1Id: string -> 
+        pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         unit
@@ -69,13 +67,13 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
                 wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag
         
-        member _.GetCandle token0Id token1Id callback resolutionTime =
+        member _.GetCandle pair callback resolutionTime =
             let callback str = callback.Invoke(str)
-            Logic.getCandle connection token0Id token1Id callback resolutionTime web3
+            Logic.getCandle connection pair callback resolutionTime web3
 
-        member _.GetCandles token0Id token1Id callback resolutionTime = 
+        member _.GetCandles pair callback resolutionTime = 
             let callback str = callback.Invoke(str)
-            Logic.getCandles connection token0Id token1Id callback resolutionTime web3
+            Logic.getCandles connection pair callback resolutionTime web3
 
 module Logic =
     [<Literal>]
@@ -85,10 +83,11 @@ type ICandleStorageService =
     abstract UpdateCandleAsync: Candle -> Task
     abstract AddCandleAsync: Candle -> Task
     abstract FetchCandlesAsync: 
-        token0Id: string -> 
-        token1Id: string -> 
+        pairId: int64 ->
         resolutionSeconds: int -> 
         Task<seq<DbCandle>>
+    abstract FetchPairsAsync: unit -> Task<seq<Pair>>
+    abstract AddPairAsync: Pair -> Task
     
 type CandleStorageService(sqlite: ISqlConnectionProvider) =
     let connection = sqlite.GetConnection()
@@ -100,5 +99,11 @@ type CandleStorageService(sqlite: ISqlConnectionProvider) =
         member _.AddCandleAsync candle = 
             Db.addCandle connection candle |> Async.StartAsTask :> Task
         
-        member _.FetchCandlesAsync token0Id token1Id resolutionSeconds = 
-            Db.fetchCandles connection token0Id token1Id resolutionSeconds |> Async.StartAsTask
+        member _.FetchCandlesAsync pairId resolutionSeconds = 
+            Db.fetchCandles connection pairId resolutionSeconds |> Async.StartAsTask
+
+        member _.FetchPairsAsync () = 
+            Db.fetchPairsAsync connection |> Async.StartAsTask
+
+        member _.AddPairAsync pair = 
+            Db.addPairAsync connection pair |> Async.StartAsTask :> Task

@@ -48,18 +48,25 @@ namespace WebSocket.Uniswap.Controllers
                 return BadRequest("An interval should be provided");
             }
 
-            var startDateTime = startTime == null
+            var pair = (await candleStorage.FetchPairsAsync()).FirstOrDefault(pair => token0Id == pair.token0Id && 
+                                                                                      token1Id == pair.token1Id);
+            if (pair == null)
+                return BadRequest("There is now such pair");
+
+            /*var startDateTime = startTime == null
                 ? DateTimeOffset.MinValue.UtcDateTime
                 : DateTimeOffset.FromUnixTimeSeconds(startTime.Value).UtcDateTime;
             var endDateTime = endTime == null
                 ? DateTimeOffset.MaxValue.UtcDateTime
-                : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;
+                : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;*/
+            startTime ??= new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds() - 60;
+            endTime ??= new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
             limit ??= 10;
 
-            var candles = await candleStorage.FetchCandlesAsync(token0Id, token1Id, periodSeconds);
+            var candles = await candleStorage.FetchCandlesAsync(pair.id, periodSeconds);
 
             return candles
-                .Where(c => c.datetime >= startDateTime && c.datetime <= endDateTime)
+                .Where(c => c.datetime >= startTime && c.datetime <= endTime)
                 .OrderByDescending(c => c.datetime)
                 .Take(limit.Value);
         }

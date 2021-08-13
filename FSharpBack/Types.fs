@@ -14,28 +14,16 @@ module Types =
     
     [<CLIMutable>]
     type DbCandle =
-        { datetime: DateTime
+        { datetime: int64
           resolutionSeconds: int
-          token0Id: string
-          token1Id: string
+          pairId:int64
           _open: string
           high: string
           low: string
           close: string
           volume: int }
 
-    type Swap =
-        { id: string
-          amount0In: float
-          amount0Out: float
-          amount1In: float
-          amount1Out: float
-          timestamp: int64 }
-
-    type PairInfo =
-        { reserve0: BigInteger
-          reserve1: BigInteger
-          price0: float
-          price1: float
+    type Pair =
+        { id: int64
           token0Id: string
           token1Id: string }

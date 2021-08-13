@@ -15,16 +15,19 @@ namespace WebSocket.Uniswap.Middlewares
         private readonly WebSocketConnectionsOptions _options;
         private readonly IWebSocketConnectionsService _connectionsService;
         private readonly ILogicService _logic;
+        private readonly ICandleStorageService _candleStorageService;
 
         public WebSocketConnectionsMiddleware(
             RequestDelegate next, 
             WebSocketConnectionsOptions options, 
             IWebSocketConnectionsService connectionsService,
-            ILogicService logic)
+            ILogicService logic,
+            ICandleStorageService candleStorageService)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _connectionsService = connectionsService ?? throw new ArgumentNullException(nameof(connectionsService));
             _logic = logic;
+            _candleStorageService = candleStorageService;
         }
 
         public async Task Invoke(HttpContext context)
@@ -52,7 +55,7 @@ namespace WebSocket.Uniswap.Middlewares
 
                     var cancelReceiveMessages = new CancellationTokenSource();
 
-                    await webSocketConnection.ReceiveMessagesUntilCloseAsync(_logic);
+                    await webSocketConnection.ReceiveMessagesUntilCloseAsync(_logic, _candleStorageService);
 
                     if (webSocketConnection.CloseStatus.HasValue)
                     {

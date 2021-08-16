@@ -9,7 +9,7 @@ open Nethereum.Contracts
 open Nethereum.Util
 open Contracts.UniswapV3Router.ContractDefinition
 
-module SwapRouterV3 =
+module UniswapSwapRouterV3 =
     let routerAddress = "0xe592427a0aece92de3edee1f18e0157c05861564"
     let addresses = [ routerAddress ]
 

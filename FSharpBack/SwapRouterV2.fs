@@ -10,9 +10,12 @@ open Contracts.UniswapV2Router.ContractDefinition
 
 
 module SwapRouterV2 =
-    let router01Address = "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a"
-    let router02Address = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
-    let addresses = [ router01Address; router02Address ]
+    let uniswapRouter01Address = "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a"
+    let uniswapRouter02Address = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+
+    let pancakeRouterAddress = "0x10ed43c718714eb63d5aa57b78b54704e256024e"
+
+    let addresses = [ pancakeRouterAddress ]
 
 
     let swapExactTokensForTokensId = "0x38ed1739"

@@ -31,9 +31,7 @@ module Logic =
         /// Returns Some function to obtain transaction information if transaction recipient 
         /// matches any known.
         let transactionData transaction receipt = 
-          [ tryGetTransactionInfo SwapRouterV3.addresses SwapRouterV3.getInfoFromRouter
-            tryGetTransactionInfo SwapRouterV2.addresses SwapRouterV2.getInfoFromRouter
-            tryGetTransactionInfo ExchangeV1.addresses ExchangeV1.getInfoFromExchange ] 
+          [tryGetTransactionInfo SwapRouterV2.addresses SwapRouterV2.getInfoFromRouter] 
           |> List.map (fun f -> f transaction)
           |> List.tryFind Option.isSome 
           |> Option.get
@@ -86,10 +84,7 @@ module Logic =
             transactions
             |> Array.filter
                 (fun transaction ->
-                    (transaction.To = SwapRouterV3.routerAddress 
-                    || transaction.To = SwapRouterV2.router01Address
-                    || transaction.To = SwapRouterV2.router02Address
-                    || transaction.To = ExchangeV1.exchangeAddress)
+                    (List.tryFind(fun address -> address = transaction.To) SwapRouterV2.addresses) <> None
                     && transaction.Input <> "0x")
 
         let filterSuccessfulTranscations (transactionsWithReceipts: Tuple<Transaction, TransactionReceipt> []) =
@@ -121,6 +116,8 @@ module Logic =
             let mutable firstIterFlag = true
 
             while block.Timestamp.Value > resolutionTimeAgoUnix do
+                printfn "blockNumber = %A" blockNumber
+
                 let swapTransactions =
                     filterSwapTransactions block.Transactions
                     |> Array.rev
@@ -155,7 +152,6 @@ module Logic =
                 candle <- _candle
                 wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag <- _firstIterFlag
-                printfn "blockNumber = %A" blockNumber
                 blockNumber <- blockNumber - 1I
 
                 let! helpfulBlock = HexBigInteger blockNumber
@@ -239,6 +235,9 @@ module Logic =
     let firstUniswapExchangeTimestamp =
         DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
 
+    let pancakeLauchDateTimestamp = 
+        DateTime(2020, 9, 20, 0, 0, 0).ToUniversalTime()
+
     let getTimeSamples (period: DateTime * DateTime) rate =
         let rec inner (a: DateTime, b) samples =
             if a >= b then 
@@ -250,7 +249,7 @@ module Logic =
     let getCandles connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) cancelToken =
         try
             let b = DateTime.Now.ToUniversalTime()
-            let a = firstUniswapExchangeTimestamp
+            let a = pancakeLauchDateTimestamp
             for t in getTimeSamples (a, b) resolutionTime do
                 let computation = buildCandleSendCallbackAndWriteToDBAsync 
                                       connection resolutionTime pair callback web3 t

@@ -8,6 +8,7 @@ using System.Text;
 using Newtonsoft.Json;
 using WebSocket.Uniswap.Models;
 using RedDuck.Candleswap.Candles.CSharp;
+using Microsoft.Extensions.Logging;
 
 namespace WebSocket.Uniswap.Infrastructure
 {
@@ -52,7 +53,8 @@ namespace WebSocket.Uniswap.Infrastructure
                                         cancellationToken: cancellationToken);
         }
 
-        public async Task ReceiveMessagesUntilCloseAsync(ILogicService logic, ICandleStorageService candleStorage)
+        public async Task ReceiveMessagesUntilCloseAsync(ILogicService logic, ICandleStorageService candleStorage,
+                                                         ILogger<WebSocketConnection> logger)
         {
             try
             {
@@ -97,6 +99,10 @@ namespace WebSocket.Uniswap.Infrastructure
             catch (WebSocketException wsex) when (wsex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
             {
 
+            }
+            catch(Exception ex)
+            {
+                logger.LogError(ex.ToString());
             }
         }
 

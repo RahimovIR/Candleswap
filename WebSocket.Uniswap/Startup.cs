@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Nethereum.Web3;
 using RedDuck.Candleswap.Candles.CSharp;
-using System.Collections.Generic;
 using WebSocket.Uniswap.Middlewares;
 using WebSocket.Uniswap.Services;
 
@@ -39,6 +39,13 @@ namespace WebSocket.Uniswap
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebSocket.Uniswap", Version = "v1" });
+            });
+
+            services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.AddConsole();
+                loggingBuilder.AddDebug();
+                loggingBuilder.AddAzureWebAppDiagnostics();
             });
 
         }

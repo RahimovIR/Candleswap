@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using RedDuck.Candleswap.Candles.CSharp;
 using System;
 using System.Collections.Generic;
@@ -16,18 +17,22 @@ namespace WebSocket.Uniswap.Middlewares
         private readonly IWebSocketConnectionsService _connectionsService;
         private readonly ILogicService _logic;
         private readonly ICandleStorageService _candleStorageService;
+        private readonly ILogger<WebSocketConnection> _logger;
 
         public WebSocketConnectionsMiddleware(
             RequestDelegate next, 
             WebSocketConnectionsOptions options, 
             IWebSocketConnectionsService connectionsService,
             ILogicService logic,
-            ICandleStorageService candleStorageService)
+            ICandleStorageService candleStorageService,
+            ILogger<WebSocketConnection> logger
+            )
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _connectionsService = connectionsService ?? throw new ArgumentNullException(nameof(connectionsService));
             _logic = logic;
             _candleStorageService = candleStorageService;
+            _logger = logger;
         }
 
         public async Task Invoke(HttpContext context)
@@ -55,7 +60,7 @@ namespace WebSocket.Uniswap.Middlewares
 
                     var cancelReceiveMessages = new CancellationTokenSource();
 
-                    await webSocketConnection.ReceiveMessagesUntilCloseAsync(_logic, _candleStorageService);
+                    await webSocketConnection.ReceiveMessagesUntilCloseAsync(_logic, _candleStorageService, _logger);
 
                     if (webSocketConnection.CloseStatus.HasValue)
                     {

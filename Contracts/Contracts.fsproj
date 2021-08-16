@@ -12,6 +12,8 @@
     <None Include="Binaries\UniswapV2Router.bin" />
     <None Include="Binaries\UniswapV3Router.bin" />
     <Compile Include="Library.fs" />
+    <Compile Include="PancakeV2Router\ContractDefinition\PancakeV2RouterDefinition.fs" />
+    <Compile Include="PancakeV2Router\PancakeV2RouterService.fs" />
     <Compile Include="UniswapV1Exchange\ContractDefinition\UniswapV1ExchangeDefinition.fs" />
     <Compile Include="UniswapV1Exchange\UniswapV1ExchangeService.fs" />
     <Compile Include="UniswapV2Router\ContractDefinition\UniswapV2RouterDefinition.fs" />

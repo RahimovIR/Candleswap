@@ -116,7 +116,6 @@ module Logic =
             let mutable firstIterFlag = true
 
             while block.Timestamp.Value > resolutionTimeAgoUnix do
-                printfn "blockNumber = %A" blockNumber
 
                 let swapTransactions =
                     filterSwapTransactions block.Transactions
@@ -152,6 +151,7 @@ module Logic =
                 candle <- _candle
                 wasRequiredTransactionsInPeriodOfTime <- _wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag <- _firstIterFlag
+                printfn "blockNumber = %A" blockNumber
                 blockNumber <- blockNumber - 1I
 
                 let! helpfulBlock = HexBigInteger blockNumber

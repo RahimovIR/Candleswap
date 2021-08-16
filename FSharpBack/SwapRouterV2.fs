@@ -6,7 +6,7 @@ open System.Linq
 open Nethereum.RPC.Eth.DTOs
 open Nethereum.ABI.FunctionEncoding.Attributes
 open Nethereum.Contracts
-open Contracts.UniswapV2Router.ContractDefinition
+open Contracts.PancakeV2Router.ContractDefinition
 
 
 module SwapRouterV2 =

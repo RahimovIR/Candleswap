@@ -9,6 +9,7 @@ open Nethereum.Web3;
 open RedDuck.Candleswap.Candles
 open RedDuck.Candleswap.Candles.Types
 open System.Data.SqlClient
+open System.Threading
 
 type ISqlConnectionProvider =
     abstract GetConnection: unit -> SqlConnection
@@ -39,12 +40,14 @@ type ILogicService =
         pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
+        cancelToken: CancellationToken ->
         unit
 
     abstract GetCandles:
         pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
+        cancelToken: CancellationToken ->
         unit
 
 type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) = 
@@ -67,13 +70,13 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
                 wasRequiredTransactionsInPeriodOfTime
                 firstIterFlag
         
-        member _.GetCandle pair callback resolutionTime =
+        member _.GetCandle pair callback resolutionTime cancelToken =
             let callback str = callback.Invoke(str)
-            Logic.getCandle connection pair callback resolutionTime web3
+            Logic.getCandle connection pair callback resolutionTime web3 cancelToken
 
-        member _.GetCandles pair callback resolutionTime = 
+        member _.GetCandles pair callback resolutionTime cancelToken = 
             let callback str = callback.Invoke(str)
-            Logic.getCandles connection pair callback resolutionTime web3
+            Logic.getCandles connection pair callback resolutionTime web3 cancelToken
 
 module Logic =
     [<Literal>]
@@ -88,7 +91,7 @@ type ICandleStorageService =
         Task<seq<DbCandle>>
     abstract FetchPairsAsync: unit -> Task<seq<Pair>>
     abstract AddPairAsync: Pair -> Task
-    
+
 type CandleStorageService(sqlite: ISqlConnectionProvider) =
     let connection = sqlite.GetConnection()
     

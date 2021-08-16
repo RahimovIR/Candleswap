@@ -80,7 +80,7 @@ namespace WebSocket.Uniswap.Infrastructure
                         else if (webSocketMessage.Contains("candles") || webSocketMessage.Contains("historicalCandles"))
                         {
                             if(webSocketMessage.Contains("unsubscribe"))
-                                OnReceiveCandlesUnsubscribeRequest(webSocketMessage);
+                                await OnReceiveCandlesUnsubscribeRequest(candleStorage, webSocketMessage);
                             else if(webSocketMessage.Contains("subscribe"))
                                 await OnReceiveCandlesSubscribeRequest(logic, candleStorage,  webSocketMessage);
                         }
@@ -129,10 +129,8 @@ namespace WebSocket.Uniswap.Infrastructure
 
             if (arrayKeyParam.Length > 3)
             {
-                if (webSocketRequest.Channel == "historicalCandles")
-                    await CandleEvent.SubscribeHistoricalCandles(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);
-                else if (webSocketRequest.Channel == "candles")
-                    await CandleEvent.SubscribeCandles(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3], OnCandleUpdateReceived, resolution);           
+                await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
+                                                        OnCandleUpdateReceived, resolution, webSocketRequest.Channel);   
             }
             else
             {
@@ -142,15 +140,14 @@ namespace WebSocket.Uniswap.Infrastructure
             ReceiveText?.Invoke(this, webSocketMessage);
         }
 
-        private void OnReceiveCandlesUnsubscribeRequest(string webSocketMessage)
+        private async Task OnReceiveCandlesUnsubscribeRequest(ICandleStorageService candleStorage, string webSocketMessage)
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
             int resolution = GetResolution(arrayKeyParam[1]);
             if (arrayKeyParam.Length > 3)
             {
-                if (webSocketRequest.Channel == "historicalCandles" || webSocketRequest.Channel == "candles")
-                    CandleEvent.UnsubscribeCandles(arrayKeyParam[2], arrayKeyParam[3], resolution);
+                await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], resolution, webSocketRequest.Channel);
             }
             else
             {

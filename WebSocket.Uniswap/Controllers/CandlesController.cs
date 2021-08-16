@@ -53,12 +53,6 @@ namespace WebSocket.Uniswap.Controllers
             if (pair == null)
                 return BadRequest("There is now such pair");
 
-            /*var startDateTime = startTime == null
-                ? DateTimeOffset.MinValue.UtcDateTime
-                : DateTimeOffset.FromUnixTimeSeconds(startTime.Value).UtcDateTime;
-            var endDateTime = endTime == null
-                ? DateTimeOffset.MaxValue.UtcDateTime
-                : DateTimeOffset.FromUnixTimeSeconds(endTime.Value).UtcDateTime;*/
             startTime ??= new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds() - 60;
             endTime ??= new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
             limit ??= 10;

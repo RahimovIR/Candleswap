@@ -14,76 +14,53 @@ namespace WebSocket.Uniswap.Infrastructure
 {
     public static class CandleEvent
     {
-        private static readonly SortedDictionary<(string, int), CancellationTokenSource> EventsInvoked = new();
+        private static readonly SortedDictionary<(string, long, int), CancellationTokenSource> EventsInvoked = new();
 
-        public async static Task SubscribeCandles(
+        public async static Task SubscribeCandlesAsync(
             ILogicService logic,
             ICandleStorageService candleStorageService,
             string token0Id,
             string token1Id,
-            Action<string> onCandle, 
-            int resolutionSeconds)
+            Action<string> onCandle,
+            int resolutionSeconds,
+            string channel)
         {
             var pair = await GetPairOrCreateNewIfNotExists(candleStorageService, token0Id, token1Id);
 
-            var uniswapId = string.Join(",", pair.token0Id, pair.token1Id);
-            if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out _))
-            {
+            if (EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out _))
                 return;
-            }
             else
-            {
-                EventsInvoked.Add((uniswapId, resolutionSeconds), new CancellationTokenSource());
-            }
-            EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out var cancelToken);
-            
-            await Task.Run(() =>
-                logic.GetCandle(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds)));
+                EventsInvoked.Add((channel, pair.id, resolutionSeconds), new CancellationTokenSource());
+            EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out var cancelToken);
+
+            if(channel == "candles")
+                Task.Run(() => logic.GetCandle(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token), cancelToken.Token);
+            else if(channel == "historicalCandles")
+                Task.Run(() => logic.GetCandles(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token), cancelToken.Token);
         }
 
-        public async static Task SubscribeHistoricalCandles(
-            ILogicService logic,
-            ICandleStorageService candleStorageService,
+        public async static Task UnsubscribeCandlesAsync(
+            ICandleStorageService candleStorage,
             string token0Id, 
-            string token1Id,
-            Action<string> onCandle, 
-            int resolutionSeconds)
+            string token1Id, 
+            int resolutionSeconds, 
+            string channel)
         {
-            var pair = await GetPairOrCreateNewIfNotExists(candleStorageService, token0Id, token1Id);
-            var uniswapId = string.Join(",", pair.token0Id, pair.token1Id);
-            if (EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out _))
-            {
-                return;
-            }
-            else
-            {
-                EventsInvoked.Add((uniswapId, resolutionSeconds), new CancellationTokenSource());
-            }
-            EventsInvoked.TryGetValue((uniswapId, resolutionSeconds), out var cancelToken);
-            var fsharpFunc = FuncConvert.ToFSharpFunc<string>(c =>
-            {
-                onCandle(c);
-            });
-            var web3 = new Nethereum.Web3.Web3("https://mainnet.infura.io/v3/dc6ea0249f9e4c1187bbcaf0fbe0ff6e");
+            var pair = await GetPairAsync(candleStorage, token0Id, token1Id);
 
-            await Task.Run(() =>
-                logic.GetCandles(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds)), 
-                cancelToken.Token);
+            if (EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out var cancelToken))
+                cancelToken.Cancel();
         }
 
-        public static void UnsubscribeCandles(string token0Id, string token1Id, int resolutionSeconds)
+        public static async Task<Pair> GetPairAsync(ICandleStorageService candleStorage, string token0Id, string token1Id)
         {
-            if (EventsInvoked.TryGetValue((string.Join(",", token0Id, token1Id), resolutionSeconds), out var cancelToken))
-            {
-                cancelToken.Cancel();
-            }
+            var pairs = await candleStorage.FetchPairsAsync();
+            return pairs.FirstOrDefault(pair => token0Id == pair.token0Id && token1Id == pair.token1Id);
         }
 
         public static async Task<Pair> GetPairOrCreateNewIfNotExists(ICandleStorageService candleStorage, string token0Id, string token1Id)
         {
-            var pairs = await candleStorage.FetchPairsAsync();
-
-            var pair = pairs.FirstOrDefault(pair => token0Id == pair.token0Id && token1Id == pair.token1Id);
+            var pair = await GetPairAsync(candleStorage, token0Id, token1Id);
             
             if(pair == null)
             {
@@ -92,9 +69,7 @@ namespace WebSocket.Uniswap.Infrastructure
                 return newPair;
             }
             else
-            {
                 return pair;
-            }
         }
     }
 }

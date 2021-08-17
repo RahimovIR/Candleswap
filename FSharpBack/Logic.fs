@@ -18,8 +18,8 @@ module Logic =
     // Updates candle information with new open, close, high and low prices if presented.
     let partlyBuildCandle
         (transactionsWithReceipts: (Transaction * TransactionReceipt) [])
-        token0Id
-        token1Id
+        (token0Id:string)
+        (token1Id:string)
         (candle: Candle)
         wasRequiredTransactionsInPeriodOfTime
         firstIterFlag =
@@ -42,7 +42,7 @@ module Logic =
             transactionsWithReceipts
             |> Array.map (fun (t, r) -> transactionData t r)
             |> Array.choose id
-            |> Array.filter (fun (inAddr, outAddr, _, _) -> (inAddr, outAddr) = (token0Id, token1Id))
+            |> Array.filter (fun (inAddr, outAddr, _, _) -> (inAddr.ToLower(), outAddr.ToLower()) = (token0Id.ToLower(), token1Id.ToLower()))
 
         let currentPrice (_, _, amountIn, amountOut) = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)
         

@@ -31,7 +31,7 @@ namespace WebSocket.Uniswap
 
             services.AddSingleton<ISqlConnectionProvider, SqlConnectionProvider>();
             services.AddTransient<ILogicService, LogicService>();
-            services.AddSingleton<IWeb3>(new Web3("https://data-seed-prebsc-1-s1.binance.org:8545/"));
+            services.AddSingleton<IWeb3>(new Web3("https://bsc-dataseed.binance.org/"));
 
             services.AddTransient<ICandleStorageService, CandleStorageService>();
 

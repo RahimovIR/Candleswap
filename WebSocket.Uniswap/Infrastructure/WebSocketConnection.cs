@@ -81,10 +81,7 @@ namespace WebSocket.Uniswap.Infrastructure
                         }
                         else if (webSocketMessage.Contains("candles") || webSocketMessage.Contains("historicalCandles"))
                         {
-                            if(webSocketMessage.Contains("unsubscribe"))
-                                await OnReceiveCandlesUnsubscribeRequest(candleStorage, webSocketMessage);
-                            else if(webSocketMessage.Contains("subscribe"))
-                                await OnReceiveCandlesSubscribeRequest(logic, candleStorage,  webSocketMessage);
+                            await OnReceiveCandlesRequest(logic, candleStorage, webSocketMessage);
                         }
                         else
                             OnReceiveText(webSocketMessage);
@@ -127,7 +124,7 @@ namespace WebSocket.Uniswap.Infrastructure
             ReceiveCandleUpdate?.Invoke(this, candle);
         }
 
-        private async Task OnReceiveCandlesSubscribeRequest(ILogicService logic, ICandleStorageService candleStorage, string webSocketMessage)
+        private async Task OnReceiveCandlesRequest(ILogicService logic, ICandleStorageService candleStorage, string webSocketMessage)
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
@@ -135,29 +132,20 @@ namespace WebSocket.Uniswap.Infrastructure
 
             if (arrayKeyParam.Length > 3)
             {
-                await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
-                                                        OnCandleUpdateReceived, resolution, webSocketRequest.Channel);   
+                switch (webSocketRequest.EventType)
+                {
+                    case "subscribe":
+                        await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
+                                                                OnCandleUpdateReceived, resolution, webSocketRequest.Channel);
+                        break;
+                    case "unsubscribe":
+                        await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], resolution, webSocketRequest.Channel);
+                        break;
+                }
             }
             else
             {
                 //TODO: Subscribe candles with pairId
-            }
-
-            ReceiveText?.Invoke(this, webSocketMessage);
-        }
-
-        private async Task OnReceiveCandlesUnsubscribeRequest(ICandleStorageService candleStorage, string webSocketMessage)
-        {
-            var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
-            var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = GetResolution(arrayKeyParam[1]);
-            if (arrayKeyParam.Length > 3)
-            {
-                await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], resolution, webSocketRequest.Channel);
-            }
-            else
-            {
-                //TODO: Unsubscribe candles with pairId
             }
 
             ReceiveText?.Invoke(this, webSocketMessage);

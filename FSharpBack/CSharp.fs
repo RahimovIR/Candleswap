@@ -41,14 +41,14 @@ type ILogicService =
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
-        unit
+        Task
 
     abstract GetCandles:
         pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
-        unit
+        Task
 
 type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) = 
     let toRefTuple = fun struct (a, b) -> (a, b)
@@ -72,11 +72,11 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
         
         member _.GetCandle pair callback resolutionTime cancelToken =
             let callback str = callback.Invoke(str)
-            Logic.getCandle connection pair callback resolutionTime web3 cancelToken
+            Logic.getCandle connection pair callback resolutionTime web3 cancelToken |> Async.StartAsTask :> Task
 
         member _.GetCandles pair callback resolutionTime cancelToken = 
             let callback str = callback.Invoke(str)
-            Logic.getCandles connection pair callback resolutionTime web3 cancelToken
+            Logic.getCandles connection pair callback resolutionTime web3 cancelToken |> Async.StartAsTask :> Task
 
 module Logic =
     [<Literal>]

@@ -34,9 +34,9 @@ namespace WebSocket.Uniswap.Infrastructure
             EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out var cancelToken);
 
             if(channel == "candles")
-                Task.Run(() => logic.GetCandle(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token), cancelToken.Token);
+                logic.GetCandle(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token);
             else if(channel == "historicalCandles")
-                Task.Run(() => logic.GetCandles(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token), cancelToken.Token);
+                logic.GetCandles(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token);
         }
 
         public async static Task UnsubscribeCandlesAsync(

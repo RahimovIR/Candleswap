@@ -10,6 +10,7 @@ open Nethereum.Util
 open RedDuck.Candleswap.Candles
 open RedDuck.Candleswap.Candles.Types
 open System.Threading
+open System.Threading.Tasks
 
 module Logic =
     let maxUInt256StringRepresentation =
@@ -95,6 +96,8 @@ module Logic =
                     r.Status.Value <> 0I)
 
         async {
+            printfn "New pass"
+
             let! initializableBlockNumber = currentTime.ToUnixTimeSeconds()
                                             |> BigInteger
                                             |> Dater.getBlockByDateAsync false web3
@@ -213,24 +216,17 @@ module Logic =
             return! sendCallbackAndWriteToDB connection dbCandle currentTime resolutionTimeAgo pair callback
         }
 
-    let getCandle connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) cancelToken =
-        let timer =
-            new System.Timers.Timer(resolutionTime.TotalMilliseconds)
-
-        let candlesHandler = new ElapsedEventHandler(fun _ _ ->
-                try 
-                    let computation = DateTime.Now.ToUniversalTime()
-                                      |> DateTimeOffset
-                                      |> buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3
-                    Async.RunSynchronously(computation, ?cancellationToken = Some(cancelToken))
-                with
-                | :? System.OperationCanceledException -> printfn "Operation was canceled!")
-
-        timer.Elapsed.AddHandler(candlesHandler)
-        timer.Start()
-
-        while true do
-            ()
+    let getCandle connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) =
+        async{
+            let mutable currentTime = DateTime.Now.ToUniversalTime() |> DateTimeOffset
+            while cancelToken.IsCancellationRequested <> true do
+                let timer = new System.Diagnostics.Stopwatch()
+                timer.Start()
+                do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 currentTime
+                currentTime <- currentTime + resolutionTime
+                do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
+            printfn "Operation was canceled!"
+        }
 
     let firstUniswapExchangeTimestamp =
         DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
@@ -246,15 +242,21 @@ module Logic =
                 inner (a.Add rate, b) (DateTimeOffset a :: samples)
         inner period []
 
-    let getCandles connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) cancelToken =
-        try
+    let getCandles connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) =
+        async{
             let b = DateTime.Now.ToUniversalTime()
             let a = pancakeLauchDateTimestamp
-            for t in getTimeSamples (a, b) resolutionTime do
-                let computation = buildCandleSendCallbackAndWriteToDBAsync 
-                                      connection resolutionTime pair callback web3 t
-                Async.RunSynchronously(computation, ?cancellationToken = Some(cancelToken))
+            let timeSamples = getTimeSamples(a, b) resolutionTime
+
+            timeSamples
+            |> List.takeWhile (
+               fun t -> async{
+                            do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 t
+                        } |> Async.RunSynchronously
+                        cancelToken.IsCancellationRequested <> true
+               ) |> ignore
+            if cancelToken.IsCancellationRequested = true
+            then printfn "Operation was canceled!"
+            else callback "Processing completed successfully"
         
-            callback "Processing completed successfully"
-        with
-        | :? System.OperationCanceledException -> printfn "Operation was canceled!"
+        }

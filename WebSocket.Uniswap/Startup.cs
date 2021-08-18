@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -9,6 +11,7 @@ using Nethereum.Web3;
 using RedDuck.Candleswap.Candles.CSharp;
 using WebSocket.Uniswap.Middlewares;
 using WebSocket.Uniswap.Services;
+using static RedDuck.Candleswap.Candles.Types;
 
 namespace WebSocket.Uniswap
 {
@@ -34,6 +37,9 @@ namespace WebSocket.Uniswap
             services.AddSingleton<IWeb3>(new Web3("https://bsc-dataseed.binance.org/"));
 
             services.AddTransient<ICandleStorageService, CandleStorageService>();
+
+            services.AddSingleton<IDictionary<(Pair, int), CancellationTokenSource>>(
+                _ => new Dictionary<(Pair, int), CancellationTokenSource>());
 
             services.AddSwaggerGen(c =>
             {

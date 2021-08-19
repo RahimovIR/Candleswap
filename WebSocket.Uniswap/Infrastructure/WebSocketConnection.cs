@@ -28,7 +28,7 @@ namespace WebSocket.Uniswap.Infrastructure
 
         public event EventHandler<byte[]> ReceiveBinary;
 
-        public static event EventHandler<string> ReceiveCandleUpdate;
+        public event EventHandler<string> ReceiveCandleUpdate;
 
         //private readonly List<(Pair, int)> _subscribedPairsWithResolutions = new();
 

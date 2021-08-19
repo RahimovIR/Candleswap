@@ -55,7 +55,7 @@ namespace WebSocket.Uniswap.Middlewares
                     }
 
                     webSocketConnection.ReceiveText += OnReceiveText;
-                    WebSocketConnection.ReceiveCandleUpdate += OnReceiveCandleUpdate;
+                    webSocketConnection.ReceiveCandleUpdate += OnReceiveCandleUpdate;
                     _connectionsService.AddConnection(webSocketConnection);
 
                     var cancelReceiveMessages = new CancellationTokenSource();
@@ -67,7 +67,7 @@ namespace WebSocket.Uniswap.Middlewares
                         await webSocket.CloseAsync(webSocketConnection.CloseStatus.Value, webSocketConnection.CloseStatusDescription, CancellationToken.None);
                     }
 
-                    WebSocketConnection.ReceiveCandleUpdate -= OnReceiveCandleUpdate;
+                    webSocketConnection.ReceiveCandleUpdate -= OnReceiveCandleUpdate;
                     webSocketConnection.ReceiveText -= OnReceiveText;
                     _connectionsService.RemoveConnection(webSocketConnection.Id);
 

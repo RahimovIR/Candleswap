@@ -189,9 +189,9 @@ module Logic =
         match candle with
         | Some candle ->
             callback (
-                $"token0Id:{pair.token0Id}\ntoken1Id:{pair.token1Id}\nresolutionSeconds:{candle.resolutionSeconds}\n"
-                + $"datetime:{candle.datetime}\n_open:{candle._open}\nlow:{candle.low}\nhigh:{candle.high}\n"
-                + $"close:{candle.close}\nvolume:{candle.volume}"
+                $"token0Id:{pair.token0Id};\ntoken1Id:{pair.token1Id};\nresolutionSeconds:{candle.resolutionSeconds};\n"
+                + $"datetime:{candle.datetime};\n_open:{candle._open};\nlow:{candle.low};\nhigh:{candle.high};\n"
+                + $"close:{candle.close};\nvolume:{candle.volume};"
             )
 
             Db.addCandle connection candle

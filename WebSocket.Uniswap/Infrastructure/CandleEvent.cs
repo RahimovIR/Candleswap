@@ -15,7 +15,8 @@ namespace WebSocket.Uniswap.Infrastructure
 {
     public static class CandleEvent
     {
-        private static readonly SortedDictionary<(string, long, int), CancellationTokenSource> EventsInvoked = new();
+        private static readonly SortedDictionary<(Pair, int), CancellationTokenSource> _processingCandles = new();
+        public static readonly Dictionary<(Pair, int), List<Guid>> _subscriptions = new(); 
 
         public async static Task SubscribeCandlesAsync(
             ILogicService logic,
@@ -24,33 +25,39 @@ namespace WebSocket.Uniswap.Infrastructure
             string token1Id,
             Action<string> onCandle,
             int resolutionSeconds,
-            string channel)
+            Guid subscriberId)
         {
             var pair = await CandleStorageHelper.GetPairOrCreateNewIfNotExists(candleStorageService, token0Id, token1Id);
 
-            if (EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out _))
-                return;
+            if (_processingCandles.TryGetValue((pair, resolutionSeconds), out _))
+                _subscriptions[(pair, resolutionSeconds)].Add(subscriberId);
             else
-                EventsInvoked.Add((channel, pair.id, resolutionSeconds), new CancellationTokenSource());
-            EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out var cancelToken);
+            {
+                _subscriptions.Add((pair, resolutionSeconds), new List<Guid> { subscriberId });
 
-            if(channel == "candles")
+                var cancelToken = new CancellationTokenSource();
+                _processingCandles.Add((pair, resolutionSeconds), cancelToken);
                 logic.GetCandle(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token);
-            else if(channel == "historicalCandles")
-                logic.GetCandles(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token);
+            }
         }
 
         public async static Task UnsubscribeCandlesAsync(
             ICandleStorageService candleStorage,
             string token0Id, 
             string token1Id, 
-            int resolutionSeconds, 
-            string channel)
+            int resolutionSeconds,
+            Guid subscriberId)
         {
             var pair = await CandleStorageHelper.GetPairAsync(candleStorage, token0Id, token1Id);
 
-            if (EventsInvoked.TryGetValue((channel, pair.id, resolutionSeconds), out var cancelToken))
-                cancelToken.Cancel();
+            if(_subscriptions.TryGetValue((pair, resolutionSeconds), out var subscribers))
+            {
+                subscribers.Remove(subscriberId);
+                if(subscribers.Count == 0 && _processingCandles.TryGetValue((pair, resolutionSeconds), out var cancelToken))
+                {
+                    cancelToken.Cancel();
+                }
+            }
         }
     }
 }

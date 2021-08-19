@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using WebSocket.Uniswap.Models;
 using RedDuck.Candleswap.Candles.CSharp;
 using Microsoft.Extensions.Logging;
+using static RedDuck.Candleswap.Candles.Types;
 
 namespace WebSocket.Uniswap.Infrastructure
 {
@@ -27,7 +28,9 @@ namespace WebSocket.Uniswap.Infrastructure
 
         public event EventHandler<byte[]> ReceiveBinary;
 
-        public event EventHandler<string> ReceiveCandleUpdate;
+        public static event EventHandler<string> ReceiveCandleUpdate;
+
+        //private readonly List<(Pair, int)> _subscribedPairsWithResolutions = new();
 
         public WebSocketConnection(System.Net.WebSockets.WebSocket webSocket, int receivePayloadBufferSize)
         {
@@ -79,7 +82,7 @@ namespace WebSocket.Uniswap.Infrastructure
                         {
                             OnReceivePingPong(webSocketMessage);
                         }
-                        else if (webSocketMessage.Contains("candles") || webSocketMessage.Contains("historicalCandles"))
+                        else if (webSocketMessage.Contains("candles"))
                         {
                             await OnReceiveCandlesRequest(logic, candleStorage, webSocketMessage);
                         }
@@ -121,7 +124,10 @@ namespace WebSocket.Uniswap.Infrastructure
 
         private void OnCandleUpdateReceived(string candle)
         {
-            ReceiveCandleUpdate?.Invoke(this, candle);
+            foreach(var pairResolution in CandleEvent._subscriptions)
+                foreach(var guid in pairResolution.Value)
+                    if(guid == Id)
+                        ReceiveCandleUpdate?.Invoke(this, candle);
         }
 
         private async Task OnReceiveCandlesRequest(ILogicService logic, ICandleStorageService candleStorage, string webSocketMessage)
@@ -136,10 +142,10 @@ namespace WebSocket.Uniswap.Infrastructure
                 {
                     case "subscribe":
                         await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
-                                                                OnCandleUpdateReceived, resolution, webSocketRequest.Channel);
+                                                                OnCandleUpdateReceived, resolution, Id);
                         break;
                     case "unsubscribe":
-                        await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], resolution, webSocketRequest.Channel);
+                        await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], resolution, Id);
                         break;
                 }
             }

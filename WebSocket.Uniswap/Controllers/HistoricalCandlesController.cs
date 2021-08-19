@@ -32,12 +32,15 @@ namespace WebSocket.Uniswap.Controllers
         public async Task<IActionResult> Start(
             [FromQuery] string token0Id,
             [FromQuery] string token1Id,
-            [FromQuery] int periodSeconds)
+            [FromQuery] int periodSeconds,
+            [FromQuery] long? startFrom)
         {
             if (string.IsNullOrEmpty(token0Id) || string.IsNullOrEmpty(token1Id))
                 return BadRequest("Two tokens should be provided");
             if (periodSeconds == default)
                 return BadRequest("An period should be provided");
+
+            startFrom ??= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
             var pair = await CandleStorageHelper.GetPairOrCreateNewIfNotExists(_candleStorageService, token0Id, token1Id);
 
@@ -47,7 +50,8 @@ namespace WebSocket.Uniswap.Controllers
             {
                 var cancellationTokenSource = new CancellationTokenSource();
                 _processingHistoricalCandles.Add((pair, periodSeconds), cancellationTokenSource);
-                _logicService.GetCandles(pair, _ => { } , TimeSpan.FromSeconds(periodSeconds), cancellationTokenSource.Token);
+                _logicService.GetCandles(pair, _ => { } , TimeSpan.FromSeconds(periodSeconds), cancellationTokenSource.Token, 
+                                         DateTimeOffset.FromUnixTimeSeconds((long)startFrom).DateTime);
                 return Ok(new { message = "Indexing started successfully" });
             }
         }

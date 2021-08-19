@@ -242,9 +242,9 @@ module Logic =
                 inner (a.Add rate, b) (DateTimeOffset a :: samples)
         inner period []
 
-    let getCandles connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) =
+    let getCandles connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) startFrom =
         async{
-            let b = DateTime.Now.ToUniversalTime()
+            let b = startFrom
             let a = pancakeLauchDateTimestamp
             let timeSamples = getTimeSamples(a, b) resolutionTime
 

@@ -28,7 +28,7 @@ namespace WebSocket.Uniswap.Infrastructure
 
         public event EventHandler<byte[]> ReceiveBinary;
 
-        public event EventHandler<string> ReceiveCandleUpdate;
+        public static event EventHandler<string> ReceiveCandleUpdate;
 
         //private readonly List<(Pair, int)> _subscribedPairsWithResolutions = new();
 
@@ -124,34 +124,38 @@ namespace WebSocket.Uniswap.Infrastructure
 
         private void OnCandleUpdateReceived(string candle)
         {
-            foreach(var pairResolution in CandleEvent._subscriptions)
-                foreach(var guid in pairResolution.Value)
-                    if(guid == Id)
-                        ReceiveCandleUpdate?.Invoke(this, candle);
+            ReceiveCandleUpdate?.Invoke(this, candle);
         }
 
         private async Task OnReceiveCandlesRequest(ILogicService logic, ICandleStorageService candleStorage, string webSocketMessage)
         {
             var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
-            int resolution = GetResolution(arrayKeyParam[1]);
-
-            if (arrayKeyParam.Length > 3)
+            //int resolution = GetResolution(arrayKeyParam[1]);
+            if(arrayKeyParam.Length < 4)
             {
-                switch (webSocketRequest.EventType)
-                {
-                    case "subscribe":
-                        await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
-                                                                OnCandleUpdateReceived, resolution, Id);
-                        break;
-                    case "unsubscribe":
-                        await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], resolution, Id);
-                        break;
-                }
+                await SendAsync("Params should be correct", CancellationToken.None);
             }
-            else
+            if (string.IsNullOrEmpty(arrayKeyParam[2]) || string.IsNullOrEmpty(arrayKeyParam[3]))
             {
-                //TODO: Subscribe candles with pairId
+                await SendAsync("Two tokens should be provided", CancellationToken.None);
+                return;
+            }
+            if (!int.TryParse(arrayKeyParam[1], out int period) || period == default)
+            {
+                await SendAsync("Period should be in seconds", CancellationToken.None);
+                return;
+            }
+
+            switch (webSocketRequest.EventType)
+            {
+                case "subscribe":
+                    await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
+                                                            OnCandleUpdateReceived, period, Id);
+                    break;
+                case "unsubscribe":
+                    await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], period, Id);
+                    break;
             }
 
             ReceiveText?.Invoke(this, webSocketMessage);

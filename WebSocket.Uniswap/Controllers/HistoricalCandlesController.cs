@@ -47,7 +47,7 @@ namespace WebSocket.Uniswap.Controllers
             {
                 var cancellationTokenSource = new CancellationTokenSource();
                 _processingHistoricalCandles.Add((pair, periodSeconds), cancellationTokenSource);
-                _logicService.GetCandle(pair, _ => { } , TimeSpan.FromSeconds(periodSeconds), cancellationTokenSource.Token);
+                _logicService.GetCandles(pair, _ => { } , TimeSpan.FromSeconds(periodSeconds), cancellationTokenSource.Token);
                 return Ok(new { message = "Indexing started successfully" });
             }
         }

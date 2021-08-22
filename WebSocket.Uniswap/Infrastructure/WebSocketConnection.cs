@@ -129,7 +129,13 @@ namespace WebSocket.Uniswap.Infrastructure
 
         private async Task OnReceiveCandlesRequest(ILogicService logic, ICandleStorageService candleStorage, string webSocketMessage)
         {
-            var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(webSocketMessage);
+            string processedMessage;
+            if (webSocketMessage.Count(symbol => symbol == '{' || symbol == '}') % 2 == 0)
+                processedMessage = webSocketMessage;
+            else
+                processedMessage = webSocketMessage.Trim('}');
+
+            var webSocketRequest = JsonConvert.DeserializeObject<CandleUpdate>(processedMessage);
             var arrayKeyParam = webSocketRequest.KeyParam.Split(':');
             //int resolution = GetResolution(arrayKeyParam[1]);
             if(arrayKeyParam.Length < 4)

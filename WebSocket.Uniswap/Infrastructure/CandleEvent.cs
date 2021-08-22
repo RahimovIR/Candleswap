@@ -56,6 +56,8 @@ namespace WebSocket.Uniswap.Infrastructure
                 if(subscribers.Count == 0 && _processingCandles.TryGetValue((pair, resolutionSeconds), out var cancelToken))
                 {
                     cancelToken.Cancel();
+                    _subscriptions.Remove((pair, resolutionSeconds));
+                    _processingCandles.Remove((pair, resolutionSeconds));
                 }
             }
         }

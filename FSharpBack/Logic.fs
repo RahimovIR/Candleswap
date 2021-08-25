@@ -219,14 +219,17 @@ module Logic =
 
     let getCandle connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) =
         async{
-            let mutable currentTime = DateTime.Now.ToUniversalTime() |> DateTimeOffset
-            while cancelToken.IsCancellationRequested <> true do
-                let timer = new System.Diagnostics.Stopwatch()
-                timer.Start()
-                do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 currentTime
-                currentTime <- currentTime + resolutionTime
-                do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
-            printfn "Operation was canceled!"
+            try
+                let mutable currentTime = DateTime.Now.ToUniversalTime() |> DateTimeOffset
+                while cancelToken.IsCancellationRequested <> true do
+                    let timer = new System.Diagnostics.Stopwatch()
+                    timer.Start()
+                    do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 currentTime
+                    currentTime <- currentTime + resolutionTime
+                    do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
+                printfn "Operation was canceled!"
+            with
+            | ex -> ex.ToString() |> printfn "%s"
         }
 
     let firstUniswapExchangeTimestamp =
@@ -245,19 +248,24 @@ module Logic =
 
     let getCandles connection pair callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) startFrom =
         async{
-            let b = startFrom
-            let a = pancakeLauchDateTimestamp
-            let timeSamples = getTimeSamples(a, b) resolutionTime
+            try
+                let b = startFrom
+                let a = pancakeLauchDateTimestamp
+                let timeSamples = getTimeSamples(a, b) resolutionTime
 
-            timeSamples
-            |> List.takeWhile (
-               fun t -> async{
-                            do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 t
-                        } |> Async.RunSynchronously
-                        cancelToken.IsCancellationRequested <> true
-               ) |> ignore
-            if cancelToken.IsCancellationRequested = true
-            then printfn "Operation was canceled!"
-            else callback "Processing completed successfully"
-        
+                timeSamples
+                |> List.takeWhile (
+                   fun t -> async{
+                                try
+                                    do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 t
+                                with
+                                | ex -> ex.ToString() |> printfn "%s"
+                            } |> Async.RunSynchronously
+                            cancelToken.IsCancellationRequested <> true
+                   ) |> ignore
+                if cancelToken.IsCancellationRequested = true
+                then printfn "Operation was canceled!"
+                else callback "Processing completed successfully"
+            with
+            | ex -> ex.ToString() |> printfn "%s"
         }

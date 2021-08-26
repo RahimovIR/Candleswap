@@ -92,6 +92,8 @@ type ICandleStorageService =
         Task<seq<DbCandle>>
     abstract FetchPairsAsync: unit -> Task<seq<Pair>>
     abstract AddPairAsync: Pair -> Task
+    abstract FetchPairAsync: string -> string -> Task<Pair option>
+    abstract FetchPairOrCreateNewIfNotExists: string -> string -> Task<Pair>
 
 type CandleStorageService(sqlite: ISqlConnectionProvider) =
     let connection = sqlite.GetConnection()
@@ -111,3 +113,10 @@ type CandleStorageService(sqlite: ISqlConnectionProvider) =
 
         member _.AddPairAsync pair = 
             Db.addPairAsync connection pair |> Async.StartAsTask :> Task
+
+        member _.FetchPairAsync token0Id token1Id = 
+            Db.fetchPairAsync connection token0Id token1Id |> Async.StartAsTask
+
+        member _.FetchPairOrCreateNewIfNotExists token0Id token1Id = 
+            Db.fetchPairOrCreateNewIfNotExists connection token0Id token1Id |> Async.StartAsTask
+

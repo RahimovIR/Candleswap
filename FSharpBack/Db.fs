@@ -96,3 +96,19 @@ module Db =
                                |> Async.AwaitTask
             printfn "records added: %i" rowsChanged
         }
+
+    let fetchPairAsync connection token0Id token1Id = 
+        async{
+            let! pairs = fetchPairsAsync connection
+            return pairs |> Seq.tryFind (fun pair -> pair.token0Id = token0Id && pair.token1Id = token1Id)
+        }
+
+    let fetchPairOrCreateNewIfNotExists connection token0Id token1Id = 
+        async{
+            let! pair = fetchPairAsync connection token0Id token1Id
+            match pair with
+            | Some pair -> return pair
+            | None -> let pair = {id = 0L; token0Id = token0Id; token1Id = token1Id}
+                      do! addPairAsync connection pair
+                      return pair
+        }

@@ -14,6 +14,7 @@ module Dater =
     let getBlockNumberAndTimestampAsync
         (savedBlocks: Dictionary<HexBigInteger, HexBigInteger>)
         (web3: IWeb3)
+        (date:BigInteger)
         (blockNumber: HexBigInteger)
         =
         async {
@@ -56,8 +57,8 @@ module Dater =
     let getNextPredictedBlockNumber currentPredictedBlockNumber skip =
         let nextPredictedBlockNumber = currentPredictedBlockNumber + skip
 
-        if nextPredictedBlockNumber <= 1I then
-            1I
+        if nextPredictedBlockNumber <= 0I then
+            0I
         else
             nextPredictedBlockNumber
 
@@ -66,12 +67,12 @@ module Dater =
             let! previousPredictedBlock =
                 predictedBlock.number.Value - 1I
                 |> HexBigInteger
-                |> getBlockNumberAndTimestampAsync savedBlocks web3
+                |> getBlockNumberAndTimestampAsync savedBlocks web3 date
 
             let! nextPredictedBlock =
                 predictedBlock.number.Value + 1I
                 |> HexBigInteger
-                |> getBlockNumberAndTimestampAsync savedBlocks web3
+                |> getBlockNumberAndTimestampAsync savedBlocks web3 date
 
             if isBestBlock
                 date
@@ -92,7 +93,7 @@ module Dater =
                 let! nextPredictedBlock =
                     getNextPredictedBlockNumber predictedBlock.number.Value (BigInteger skip)
                     |> HexBigInteger
-                    |> getBlockNumberAndTimestampAsync savedBlocks web3
+                    |> getBlockNumberAndTimestampAsync savedBlocks web3 date
 
                 let newBlockTime =
                     (predictedBlock.timestamp.Value
@@ -117,9 +118,9 @@ module Dater =
                 web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
                 |> Async.AwaitTask
 
-            let! latestBlock = getBlockNumberAndTimestampAsync savedBlocks web3 latestBlockNumber
+            let! latestBlock = getBlockNumberAndTimestampAsync savedBlocks web3 date latestBlockNumber
             let firstBlockNumber = HexBigInteger 0I
-            let! firstBlock = getBlockNumberAndTimestampAsync savedBlocks web3 firstBlockNumber
+            let! firstBlock = getBlockNumberAndTimestampAsync savedBlocks web3 date firstBlockNumber
 
             let blockTime =
                 (float (
@@ -139,7 +140,7 @@ module Dater =
                     |> Math.Ceiling
                     |> BigInteger
                     |> HexBigInteger
-                    |> getBlockNumberAndTimestampAsync savedBlocks web3
+                    |> getBlockNumberAndTimestampAsync savedBlocks web3 date
 
                 return! findBestBlock date predictedBlock ifBlockAfterDate blockTime savedBlocks checkedBlocks web3
         }

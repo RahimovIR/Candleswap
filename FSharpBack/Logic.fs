@@ -256,10 +256,10 @@ module Logic =
                 timeSamples
                 |> List.takeWhile (
                    fun t -> async{
-                                try
+                                //try
                                     do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime pair callback web3 t
-                                with
-                                | ex -> ex.ToString() |> printfn "%s"
+                                //with
+                                //| ex -> ex.ToString() |> printfn "%s"
                             } |> Async.RunSynchronously
                             cancelToken.IsCancellationRequested <> true
                    ) |> ignore

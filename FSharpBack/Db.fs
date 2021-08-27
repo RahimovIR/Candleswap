@@ -112,3 +112,14 @@ module Db =
                       do! addPairAsync connection pair
                       return pair
         }
+
+    let AddPairsIfNotExistAsync connection pairs = 
+        async{
+            let! pairsFromDb = fetchPairsAsync connection
+            for pair in pairs do
+                let pairFromDb = 
+                    pairsFromDb
+                    |> Seq.tryFind(fun p -> p.token0Id = pair.token0Id && p.token1Id = pair.token1Id)
+                if pairFromDb.IsNone
+                then do! addPairAsync connection pair
+        }

@@ -10,6 +10,7 @@ open RedDuck.Candleswap.Candles
 open RedDuck.Candleswap.Candles.Types
 open System.Data.SqlClient
 open System.Threading
+open System.Collections.Generic
 
 type ISqlConnectionProvider =
     abstract GetConnection: unit -> SqlConnection
@@ -27,24 +28,17 @@ type SqlConnectionProvider(config: IConfiguration) =
             connection.Dispose()
 
 type ILogicService =
-    abstract PartlyBuildCandle:
-        transactionsWithReceipts: struct (Transaction * TransactionReceipt) [] ->
-        token0Id: string ->
-        token1Id: string ->
-        candle: Candle ->
-        wasRequiredTransactionsInPeriodOfTime: bool ->
-        firstIterFlag: bool ->
-        Candle * bool * bool
+    abstract CalculateCandlesByTransactions:
+        transactionsWithReceipts: struct (Transaction * TransactionReceipt) list ->
+        Task<IEnumerable<Pair*Candle>>
 
     abstract GetCandle:
-        pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
         Task
 
     abstract GetCandles:
-        pair: Pair ->
         callback: Action<string> ->
         resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
@@ -56,28 +50,20 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
     let connection = sqlite.GetConnection()
 
     interface ILogicService with
-        member _.PartlyBuildCandle 
+        member _.CalculateCandlesByTransactions 
             transactionsWithReceipts
-            token0Id
-            token1Id
-            candle
-            wasRequiredTransactionsInPeriodOfTime
-            firstIterFlag = 
-            Logic.partlyBuildCandle 
-                (Array.map toRefTuple transactionsWithReceipts) 
-                token0Id
-                token1Id
-                candle
-                wasRequiredTransactionsInPeriodOfTime
-                firstIterFlag
+            = 
+            List.map toRefTuple transactionsWithReceipts
+            |> Logic.calculateCandlesByTransactions connection 
+            |> Async.StartAsTask
         
-        member _.GetCandle pair callback resolutionTime cancelToken =
+        member _.GetCandle callback resolutionTime cancelToken =
             let callback str = callback.Invoke(str)
-            Logic.getCandle connection pair callback resolutionTime web3 cancelToken |> Async.StartAsTask :> Task
+            Logic.getCandle connection callback resolutionTime web3 cancelToken |> Async.StartAsTask :> Task
 
-        member _.GetCandles pair callback resolutionTime cancelToken startFrom= 
+        member _.GetCandles callback resolutionTime cancelToken startFrom= 
             let callback str = callback.Invoke(str)
-            Logic.getCandles connection pair callback resolutionTime web3 cancelToken startFrom |> Async.StartAsTask :> Task
+            Logic.getCandles connection callback resolutionTime web3 cancelToken startFrom |> Async.StartAsTask :> Task
 
 module Logic =
     [<Literal>]
@@ -95,8 +81,8 @@ type ICandleStorageService =
     abstract FetchPairAsync: string -> string -> Task<Pair option>
     abstract FetchPairOrCreateNewIfNotExists: string -> string -> Task<Pair>
 
-type CandleStorageService(sqlite: ISqlConnectionProvider) =
-    let connection = sqlite.GetConnection()
+type CandleStorageService(sql: ISqlConnectionProvider) =
+    let connection = sql.GetConnection()
     
     interface ICandleStorageService with
         member _.UpdateCandleAsync candle = 

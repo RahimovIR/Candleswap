@@ -29,6 +29,13 @@ module SwapRouterV2 =
     let swapExactETHForTokensSupportingFeeOnTransferTokensId = "0xb6f9de95"
     let swapExactTokensForETHSupportingFeeOnTransferTokensId = "0x791ac947"
 
+    let swapFunctionIds = [swapExactTokensForTokensId; swapTokensForExactTokensId;
+                           swapExactETHForTokensId; swapTokensForExactETHId;
+                           swapExactTokensForETHId; swapETHForExactTokensId;
+                           swapExactTokensForTokensSupportingFeeOnTransferTokensId;
+                           swapExactETHForTokensSupportingFeeOnTransferTokensId;
+                           swapExactTokensForETHSupportingFeeOnTransferTokensId]
+
     [<Event("Swap")>]
     type SwapEventDTO() =
         inherit EventDTO()

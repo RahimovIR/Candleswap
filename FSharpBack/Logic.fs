@@ -230,7 +230,8 @@ module Logic =
                     timer.Start()
                     do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime callback web3 currentTime
                     currentTime <- currentTime + resolutionTime
-                    do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
+                    //do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
+                    do! Task.Delay(resolutionTime) |> Async.AwaitTask
                 printfn "Operation was canceled!"
             with
             | ex -> ex.ToString() |> printfn "%s"

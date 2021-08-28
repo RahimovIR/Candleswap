@@ -23,7 +23,6 @@ namespace WebSocket.Uniswap.Infrastructure
             ICandleStorageService candleStorageService,
             string token0Id,
             string token1Id,
-            Action<string> onCandle,
             int resolutionSeconds,
             Guid subscriberId)
         {
@@ -37,7 +36,6 @@ namespace WebSocket.Uniswap.Infrastructure
 
                 var cancelToken = new CancellationTokenSource();
                 _processingCandles.Add((pair, resolutionSeconds), cancelToken);
-                logic.GetCandle(pair, onCandle, TimeSpan.FromSeconds(resolutionSeconds), cancelToken.Token);
             }
         }
 

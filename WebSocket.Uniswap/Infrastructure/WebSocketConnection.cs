@@ -122,9 +122,9 @@ namespace WebSocket.Uniswap.Infrastructure
             ReceiveText?.Invoke(this, webSocketMessage);
         }
 
-        private void OnCandleUpdateReceived(string candle)
+        public static void OnCandleUpdateReceived(string candle)
         {
-            ReceiveCandleUpdate?.Invoke(this, candle);
+            ReceiveCandleUpdate?.Invoke(new object(), candle);
         }
 
         private async Task OnReceiveCandlesRequest(ILogicService logic, ICandleStorageService candleStorage, string webSocketMessage)
@@ -156,8 +156,7 @@ namespace WebSocket.Uniswap.Infrastructure
             switch (webSocketRequest.EventType)
             {
                 case "subscribe":
-                    await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3],
-                                                            OnCandleUpdateReceived, period, Id);
+                    await CandleEvent.SubscribeCandlesAsync(logic, candleStorage, arrayKeyParam[2], arrayKeyParam[3], period, Id);
                     break;
                 case "unsubscribe":
                     await CandleEvent.UnsubscribeCandlesAsync(candleStorage, arrayKeyParam[2], arrayKeyParam[3], period, Id);

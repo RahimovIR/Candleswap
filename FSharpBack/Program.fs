@@ -15,6 +15,6 @@ let main args =
     let startFrom = DateTimeOffset.UtcNow.DateTime
 
 
-    Logic.getCandles connection (fun candle -> printfn "%s" candle) (TimeSpan.FromSeconds(period)) web3 CancellationToken.None startFrom
+    Logic.getCandles connection (fun candle -> printfn "candle received" ) (TimeSpan.FromSeconds(period)) web3 CancellationToken.None startFrom
     |> Async.RunSynchronously
     0

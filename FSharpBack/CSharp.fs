@@ -33,13 +33,13 @@ type ILogicService =
         Task<IEnumerable<Pair*Candle>>
 
     abstract GetCandle:
-        callback: Action<string> ->
+        callback: Action<struct (Pair*DbCandle)> ->
         resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
         Task
 
     abstract GetCandles:
-        callback: Action<string> ->
+        callback: Action<struct (Pair*DbCandle)> ->
         resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
         startFrom: DateTime -> 

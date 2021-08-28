@@ -184,22 +184,19 @@ module Logic =
                                  low = candle.low.ToString()
                                  close = candle.close.ToString()
                                  volume = (int)candle.volume}
-                pairsWithDbCandles <- (pair, dbCandle)::pairsWithDbCandles
+                pairsWithDbCandles <- struct (pair, dbCandle)::pairsWithDbCandles
 
             return pairsWithDbCandles
         }
 
     let sendCallbackAndWriteToDBAsync
         connection 
-        (pairsWithDbCandles: (Pair*DbCandle) list)
+        (pairsWithDbCandles: struct (Pair*DbCandle) list)
         callback =
         async{
             for pairWithDbCandle in pairsWithDbCandles do
-                let (pair, dbCandle) = pairWithDbCandle
-                callback(
-                  $"token0Id:{pair.token0Id};\ntoken1Id:{pair.token1Id};\nresolutionSeconds:{dbCandle.resolutionSeconds};\n"
-                + $"datetime:{dbCandle.datetime};\n_open:{dbCandle._open};\nlow:{dbCandle.low};\nhigh:{dbCandle.high};\n"
-                + $"close:{dbCandle.close};\nvolume:{dbCandle.volume};")
+                let struct (_, dbCandle) = pairWithDbCandle
+                callback((pairWithDbCandle))
                 do! Db.addCandle connection dbCandle
         }
 
@@ -270,7 +267,7 @@ module Logic =
                    ) |> ignore
                 if cancelToken.IsCancellationRequested = true
                 then printfn "Operation was canceled!"
-                else callback "Processing completed successfully"
+                else printfn "Processing completed successfully"
             with
             | ex -> ex.ToString() |> printfn "%s"
         }

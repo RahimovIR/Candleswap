@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WebSocket.Uniswap.Infrastructure;
 using WebSocket.Uniswap.Services;
+using static RedDuck.Candleswap.Candles.Types;
 
 namespace WebSocket.Uniswap.Middlewares
 {
@@ -49,12 +50,25 @@ namespace WebSocket.Uniswap.Middlewares
                     {
                         await webSocketConnection.SendAsync(message, CancellationToken.None);
                     }
-                    async void OnReceiveCandleUpdate(object sender, string candle)
+                    async void OnReceiveCandleUpdate(object sender, (Pair,DbCandle) pairWithCandle)
                     {
-                        foreach (var pairResolution in CandleEvent._subscriptions)
-                            foreach (var guid in pairResolution.Value)
-                                if (guid == webSocketConnection.Id)
-                                    await webSocketConnection.SendAsync(candle, CancellationToken.None);
+                        foreach (var user in WebSocketConnection.Subscriptions)
+                            foreach (var pairResolution in user.Value) {
+                                var subscriptionPair = pairResolution.Item1;
+                                var subscriptionResolution = pairResolution.Item2;
+                                var receivedPair = pairWithCandle.Item1;
+                                var receivedCandle = pairWithCandle.Item2;
+
+                                if (subscriptionPair.token0Id == receivedPair.token0Id &&
+                                    subscriptionPair.token1Id == receivedPair.token1Id &&
+                                    subscriptionResolution == receivedCandle.resolutionSeconds)
+                                {
+                                    var candleStr = $"token0Id:{receivedPair.token0Id};\ntoken1Id:{receivedPair.token1Id};\nresolutionSeconds:{subscriptionResolution};\n"
+                                                  + $"datetime:{receivedCandle.datetime};\n_open:{receivedCandle._open};\nlow:{receivedCandle.low};\nhigh:{receivedCandle.high};\n"
+                                                  + $"close:{receivedCandle.close};\nvolume:{receivedCandle.volume};";
+                                    await webSocketConnection.SendAsync(candleStr, CancellationToken.None);
+                                }
+                            }
                     }
 
                     webSocketConnection.ReceiveText += OnReceiveText;

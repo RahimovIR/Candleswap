@@ -1,4 +1,4 @@
-﻿namespace RedDuck.Candleswap.Candles
+﻿namespace Indexer
 
 open System
 open System.Collections.Generic
@@ -150,6 +150,15 @@ module Dater =
 
         let diff = date.ToUniversalTime() - origin
         Math.Floor(diff.TotalSeconds)
+
+    let getBlockNumberByDateTimeOffsetAsync ifBlockAfterDate (web3: IWeb3) (date:DateTime) = 
+        async{
+            let! blockNumberTimestamp = (DateTimeOffset date).ToUnixTimeSeconds()
+                                        |> BigInteger
+                                        |> getBlockByDateAsync false web3
+
+            return blockNumberTimestamp.number
+        }
 
 
 

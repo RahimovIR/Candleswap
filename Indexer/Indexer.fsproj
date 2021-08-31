@@ -7,6 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Dater.fs" />
+    <Compile Include="UniswapExchangeV1.fs" />
+    <Compile Include="UniswapSwapRouterV3.fs" />
     <Compile Include="SwapRouterV2.fs" />
     <Compile Include="Indexer.fs" />
     <Compile Include="Program.fs" />

@@ -36,24 +36,21 @@ module Db =
          "select convert(varchar(66), hash, 1) hash, " +
          "convert(varchar(42), token0Id, 1) token0Id, convert(varchar(42), token1Id, 1) token1Id, convert(varchar(66), amountIn, 1) amountIn, convert(varchar(66), amountOut, 1) amountOut , convert(varchar(66), blockNumber, 1) blockNumber, convert(varchar(66), nonce, 1) nonce " + 
          "from transactions " + 
-         "where blockNumber = convert(varbinary(32), @blockNumber, 1)"
+         "where blockNumber = convert(varbinary(32), @blockNumber, 1) " + 
+         "order by blockNumber desc, nonce desc"
     
     let private insertTransactionSql = 
         "insert into transactions(hash, nonce, token0Id, token1Id, amountIn, amountOut, blockNumber) " + 
         "values(convert(varbinary(32), @hash, 1), convert(varbinary(32), @nonce, 1), " +
         "convert(varbinary(20), @token0Id, 1), convert(varbinary(20), @token1Id, 1), convert(varbinary(32), @amountIn, 1), convert(varbinary(32), @amountOut, 1), convert(varbinary(32), @blockNumber, 1))"
 
-    (*let private fetchSwapEventsSql = 
-        "select convert(varchar(66), transactionHash, 1) transactionHash, convert(varchar(66), amount0In, 1) amount0In, " +
-        "convert(varchar(66), amount1In, 1) amount1In, convert(varchar(66), amount0Out, 1) amount0Out, " +
-        "convert(varchar(66), amount1Out, 1) amount1Out " + 
-        "from swapEvents " + 
-        "where transactionHash = convert(varbinary(32), @transactionHash, 1)"
+    let private fetchTransactionsBetweenBlocksSql = 
+        "select convert(varchar(66), hash, 1) hash, " +
+        "convert(varchar(42), token0Id, 1) token0Id, convert(varchar(42), token1Id, 1) token1Id, convert(varchar(66), amountIn, 1) amountIn, convert(varchar(66), amountOut, 1) amountOut , convert(varchar(66), blockNumber, 1) blockNumber, convert(varchar(66), nonce, 1) nonce " + 
+        "from transactions " + 
+        "where convert(varbinary(32), @startBlockNumber, 1) >= blockNumber and blockNumber < convert(varbinary(32), @endBlockNumber, 1)" + 
+        "order by blockNumber desc, nonce desc"
 
-    let private insertSwapEventSql = 
-        "insert into swapEvents(transactionHash, amount0In, amount1In, amount0Out, amount1Out) " +
-        "values(convert(varbinary(32), @transactionHash, 1), convert(varbinary(32), @amount0In, 1), " + 
-        "convert(varbinary(32), @amount1In, 1), convert(varbinary(32), @amount0Out, 1), convert(varbinary(32), @amount1Out, 1))"*)
 
     let inline (=>) k v = k, box v
 
@@ -146,7 +143,7 @@ module Db =
                       return pair
         }
 
-    let addPairsIfNotExistAsync connection pairs = 
+    let addPairsIfNotExistAsync connection (pairs:Pair seq) = 
         async{
             let! pairsFromDb = fetchPairsAsync connection
             for pair in pairs do
@@ -200,28 +197,17 @@ module Db =
             printfn "records added: %i" rowsChanged
         }
 
-    (*let fetchSwapEvents connection transactionHash = 
-        let param = handleHexStringBeforeConvertingToVarbinary transactionHash
+    ///start block-inclusive endBlock-noninclusive
+    let fetchTransactionsBetweenBlocks connection (startBlockNumber:HexBigInteger) (endBlockNumber:HexBigInteger) = 
         async {
-            let! swapEvents =
+            let firstParam = handleHexStringBeforeConvertingToVarbinary startBlockNumber.HexValue
+            let secondParam = handleHexStringBeforeConvertingToVarbinary endBlockNumber.HexValue
+            let! transactions =
                 Async.AwaitTask
-                <| dbQuery<DbSwapEvent>
+                <| dbQuery<DbTransaction>
                     connection
-                    fetchSwapEventsSql
-                    (Some(dict [ "transactionHash" => param]))
-            return swapEvents
+                    fetchTransactionsBetweenBlocksSql
+                    (Some(dict [ "startBlockNumber" => firstParam
+                                 "endBlockNumber" => secondParam]))
+            return transactions
         }
-
-    let addSwapEvent connection (swapEvent:DbSwapEvent) = 
-        async {
-            let record = {transactionHash = handleHexStringBeforeConvertingToVarbinary swapEvent.transactionHash
-                          amount0In = handleHexStringBeforeConvertingToVarbinary swapEvent.amount0In
-                          amount1In = handleHexStringBeforeConvertingToVarbinary swapEvent.amount1In
-                          amount0Out = handleHexStringBeforeConvertingToVarbinary swapEvent.amount0Out
-                          amount1Out = handleHexStringBeforeConvertingToVarbinary swapEvent.amount1Out}
-            let! rowsChanged =
-                Async.AwaitTask
-                <| dbExecute connection insertSwapEventSql record
-
-            printfn "records added: %i" rowsChanged
-        }*)

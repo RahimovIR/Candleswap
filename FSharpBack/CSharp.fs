@@ -8,9 +8,10 @@ open Nethereum.RPC.Eth.DTOs
 open Nethereum.Web3;
 open RedDuck.Candleswap.Candles
 open Domain.Types
-open System.Data.SqlClient
 open System.Threading
 open System.Collections.Generic
+open Microsoft.Data.SqlClient
+open Domain
 
 type ISqlConnectionProvider =
     abstract GetConnection: unit -> SqlConnection
@@ -29,7 +30,7 @@ type SqlConnectionProvider(config: IConfiguration) =
 
 type ILogicService =
     abstract CalculateCandlesByTransactions:
-        transactionsWithReceipts: struct (Transaction * TransactionReceipt) list ->
+        swapTransactions: DbTransaction seq ->
         Task<IEnumerable<Pair*Candle>>
 
     abstract GetCandle:
@@ -51,10 +52,10 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
 
     interface ILogicService with
         member _.CalculateCandlesByTransactions 
-            transactionsWithReceipts
+            swapTransactions
             = 
-            List.map toRefTuple transactionsWithReceipts
-            |> Logic.calculateCandlesByTransactions connection 
+            swapTransactions
+            |> Logic.calculateCandlesByTransactions connection  
             |> Async.StartAsTask
         
         member _.GetCandle callback resolutionTime cancelToken =

@@ -8,6 +8,8 @@ open Nethereum.RPC.Eth.DTOs
 open Domain
 open Domain.Types
 open Microsoft.Extensions.Logging
+open System
+open Dater
 
 module Logic = 
 
@@ -132,4 +134,12 @@ module Logic =
                 do! loop()
 
                 do! indexInRangeAsync connection web3 logger startOfBlocksNotIndexedYet endBlock
+        }
+
+    let indexInTimeRangeAsync connection web3 logger startTime endTime =
+        async{
+            let! startBlock = getBlockNumberByDateTimeOffsetAsync false web3 startTime
+            let! endBlock =  getBlockNumberByDateTimeOffsetAsync false web3 endTime
+
+            do! indexInRangeAsync web3 connection logger startBlock.Value endBlock.Value
         }

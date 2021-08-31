@@ -8,10 +8,10 @@ open Nethereum.Hex.HexTypes
 open Nethereum.RPC.Eth.DTOs
 open Nethereum.Util
 open RedDuck.Candleswap.Candles
-open RedDuck.Candleswap.Candles.Types
 open System.Threading
 open System.Threading.Tasks
 open System.Collections.Generic
+open Domain.Types
 
 module Logic =
     let maxUInt256StringRepresentation =

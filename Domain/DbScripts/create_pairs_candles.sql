@@ -1,7 +1,3 @@
-DROP DATABASE IF EXISTS candleswap;
-GO
-CREATE DATABASE candleswap;
-GO
 USE candleswap;
 
 CREATE TABLE pairs(

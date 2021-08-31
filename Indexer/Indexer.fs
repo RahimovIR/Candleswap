@@ -1,0 +1,135 @@
+﻿namespace Indexer
+
+open System.Collections.Concurrent
+open Nethereum.Web3
+open Nethereum.Hex.HexTypes
+open System.Numerics
+open Nethereum.RPC.Eth.DTOs
+open Domain
+open Domain.Types
+open Microsoft.Extensions.Logging
+
+module Logic = 
+
+    let indexBlockAsync (web3:IWeb3) connection (logger:ILogger) (blockNumber:BigInteger) =
+        let filterSwapTransactions transactions =
+            transactions
+            |> Array.filter
+                (fun (transaction:Transaction) ->
+                    (Array.tryFind(fun address -> address = transaction.To) SwapRouterV2.addresses) <> None
+                    && transaction.Input <> "0x"
+                    && SwapRouterV2.swapFunctionIds
+                       |> Array.exists (fun func -> 
+                       transaction.Input.Contains(func)))
+
+        let map (transaction: Transaction) =
+            async {
+                return!
+                    web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
+                    |> Async.AwaitTask
+            }
+
+        let filterSuccessfulTranscations transactionsWithReceipts =
+            transactionsWithReceipts
+            |> Array.filter
+                (fun tr ->
+                    let (_, (r:TransactionReceipt)) = tr
+                    r.Status.Value <> 0I)
+
+        let tryGetTransactionInfo addresses infoFunc (transaction: Transaction) =
+            if Array.contains transaction.To addresses
+            then Some infoFunc
+            else None
+
+        /// Returns Some function to obtain transaction information if transaction recipient 
+        /// matches any known.
+        let getTransactionData transaction receipt = 
+            [tryGetTransactionInfo SwapRouterV2.addresses SwapRouterV2.getInfoFromRouter] 
+            |> List.map (fun f -> f transaction)
+            |> List.tryFind Option.isSome 
+            |> Option.get
+            |> Option.map (fun f -> (f transaction receipt, transaction))
+
+        async{
+            //logger.LogInformation($"Start indexing {blockNumber} block")
+            printfn $"Start indexing {blockNumber} block"
+            let! block = HexBigInteger blockNumber
+                         |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                         |> Async.AwaitTask
+
+            do! Db.addBlockAsync connection {number = (HexBigInteger blockNumber).HexValue 
+                                             timestamp = block.Timestamp.HexValue}
+
+            let transactions = block.Transactions
+                               |> filterSwapTransactions
+                               
+            let! receipts = transactions
+                            |> Array.map map 
+                            |> Async.Parallel
+
+            let transactionsWithReceipts = 
+                Array.map2 (fun transaction receipt -> (transaction, receipt)) transactions receipts
+                |> filterSuccessfulTranscations
+
+            /// Extended information about transactions to Uniswap contracts.
+            let actualTransactionsData = 
+                transactionsWithReceipts
+                |> Array.map (fun (t, r) -> getTransactionData t r)
+                |> Array.choose id
+
+            for ((token0Id, token1Id, amountIn, amountOut), transaction) in actualTransactionsData do
+                let dbTransaction = 
+                    { hash = transaction.TransactionHash
+                      token0Id = token0Id
+                      token1Id = token1Id
+                      amountIn = (HexBigInteger amountIn).HexValue
+                      amountOut = (HexBigInteger amountOut).HexValue
+                      blockNumber = (HexBigInteger blockNumber).HexValue
+                      nonce = transaction.Nonce.HexValue}
+                do! Db.addTransactionAsync connection dbTransaction
+        }                                  
+
+    let indexInRangeAsync web3 connection (logger:ILogger) startBlock endBlock = 
+        async{
+            let loop () =
+                async{
+                    let rec inner i = 
+                        async{
+                            if i > endBlock
+                            then do! indexBlockAsync web3 connection logger i
+                                 do! inner (i - 1I)
+                        }
+                    do! inner startBlock
+                }
+            do! loop()
+        }
+
+    ///Indexing from the end of blockchain to the beginning
+    ///start block-inclusive endBlock-noninclusive
+    let indexInRangeParallel connection web3 (logger:ILogger) startBlock endBlock stepOption =
+        async{
+            if startBlock < endBlock 
+            then logger.LogError "startBlock must be grater than endBlock"
+            else
+                let step = if Option.isNone stepOption then 20I else stepOption.Value
+
+                let steps = (startBlock - endBlock) / step
+                let startOfBlocksNotIndexedYet = startBlock - step * steps
+
+                let loop () =
+                    async{
+                        let rec inner i j =
+                            async{
+                                if j > 0I
+                                then indexInRangeAsync connection web3 logger 
+                                                       i (i - step)
+                                     |> Async.StartAsTask
+                                     do! inner (i - step) (j - 1I)
+                            }
+                        do! inner startBlock steps
+                    }
+
+                do! loop()
+
+                do! indexInRangeAsync connection web3 logger startOfBlocksNotIndexedYet endBlock
+        }

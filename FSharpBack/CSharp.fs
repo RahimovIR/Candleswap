@@ -7,7 +7,7 @@ open Microsoft.Extensions.Configuration
 open Nethereum.RPC.Eth.DTOs
 open Nethereum.Web3;
 open RedDuck.Candleswap.Candles
-open RedDuck.Candleswap.Candles.Types
+open Domain.Types
 open System.Data.SqlClient
 open System.Threading
 open System.Collections.Generic

@@ -12,7 +12,8 @@ namespace WebSocket.Uniswap.Helpers
         public static async Task<Pair> GetPairAsync(ICandleStorageService candleStorage, string token0Id, string token1Id)
         {
             var pairs = await candleStorage.FetchPairsAsync();
-            return pairs.FirstOrDefault(pair => token0Id == pair.token0Id && token1Id == pair.token1Id);
+            return pairs.FirstOrDefault(pair => String.Compare(token0Id, pair.token0Id, true) == 0 &&
+                                                String.Compare(token1Id, pair.token1Id, true) == 0);
         }
 
         public static async Task<Pair> GetPairOrCreateNewIfNotExists(ICandleStorageService candleStorage, string token0Id, string token1Id)

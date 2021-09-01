@@ -65,11 +65,3 @@ module Types =
 
         [<Parameter("address", "to", 6, true)>]
         member val To = Unchecked.defaultof<string> with get, set
-
-    (*type DbSwapEvent = {
-        transactionHash: string
-        amount0In: string
-        amount1In: string
-        amount0Out: string
-        amount1Out: string
-    }*)

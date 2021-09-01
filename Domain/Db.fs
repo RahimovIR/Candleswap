@@ -132,10 +132,14 @@ module Db =
             printfn "records added: %i" rowsChanged
         }
 
-    let fetchPairAsync connection token0Id token1Id = 
+    let fetchPairAsync connection (token0Id:string) (token1Id:string) = 
         async{
             let! pairs = fetchPairsAsync connection
-            return pairs |> Seq.tryFind (fun pair -> pair.token0Id = token0Id && pair.token1Id = token1Id)
+            return pairs 
+                   |> Seq.tryFind 
+                      (fun pair -> 
+                           String.Compare(pair.token0Id, token0Id, true) = 0 && 
+                           String.Compare(pair.token1Id, token1Id, true) = 0)
         }
 
     let fetchPairOrCreateNewIfNotExists connection token0Id token1Id = 

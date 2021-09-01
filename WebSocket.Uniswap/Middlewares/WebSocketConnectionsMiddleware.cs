@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WebSocket.Uniswap.Infrastructure;
 using WebSocket.Uniswap.Services;
-using static RedDuck.Candleswap.Candles.Types;
+using static Domain.Types;
 
 namespace WebSocket.Uniswap.Middlewares
 {

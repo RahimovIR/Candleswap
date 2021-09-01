@@ -12,7 +12,7 @@ using RedDuck.Candleswap.Candles.CSharp;
 using WebSocket.Uniswap.Background;
 using WebSocket.Uniswap.Middlewares;
 using WebSocket.Uniswap.Services;
-using static RedDuck.Candleswap.Candles.Types;
+using static Domain.Types;
 
 namespace WebSocket.Uniswap
 {
@@ -27,6 +27,13 @@ namespace WebSocket.Uniswap
 
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.AddConsole();
+                loggingBuilder.AddDebug();
+                loggingBuilder.AddAzureWebAppDiagnostics();
+            });
+
             services.AddControllers();
 
             services.AddWebSocketConnections();
@@ -37,23 +44,20 @@ namespace WebSocket.Uniswap
             services.AddTransient<ILogicService, LogicService>();
             services.AddSingleton<IWeb3>(new Web3("https://bsc-dataseed.binance.org/"));
 
+
             services.AddTransient<ICandleStorageService, CandleStorageService>();
+            services.AddSingleton<IIndexerService, IndexerService>(sp => 
+                new IndexerService(sp.GetService<IWeb3>(), sp.GetService<ISqlConnectionProvider>(),
+                                   sp.GetService<ILogger<BlockchainListener>>()));
 
             services.AddSingleton<IDictionary<(Pair, int), CancellationTokenSource>>(
                 _ => new Dictionary<(Pair, int), CancellationTokenSource>());
 
-            services.AddHostedService<Indexer>();
+            services.AddHostedService<BlockchainListener>();
 
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebSocket.Uniswap", Version = "v1" });
-            });
-
-            services.AddLogging(loggingBuilder =>
-            {
-                loggingBuilder.AddConsole();
-                loggingBuilder.AddDebug();
-                loggingBuilder.AddAzureWebAppDiagnostics();
             });
 
         }

@@ -32,7 +32,7 @@ let main argv =
 
     let logger = new Logger<DbCandle>(new LoggerFactory())
 
-    indexInRangeParallel web3 connection logger 10481429I 10481329I None
+    indexInRangeParallel connection web3 logger 10481429I 10481329I None
     |> Async.RunSynchronously
 
     while true do ()

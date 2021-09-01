@@ -9,8 +9,8 @@ using Newtonsoft.Json;
 using WebSocket.Uniswap.Models;
 using RedDuck.Candleswap.Candles.CSharp;
 using Microsoft.Extensions.Logging;
-using static RedDuck.Candleswap.Candles.Types;
 using Microsoft.FSharp.Core;
+using static Domain.Types;
 
 namespace WebSocket.Uniswap.Infrastructure
 {

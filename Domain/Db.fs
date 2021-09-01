@@ -32,6 +32,11 @@ module Db =
 
     let private insertBlockSql = "insert into blocks(number, timestamp) values(convert(varbinary(32), @number, 1), convert(varbinary(32), @timestamp, 1))"
 
+    let private fetchLastRecordedBlockSql = 
+        "select convert(varchar(66), number, 1), convert(varchar(66), timestamp, 1) " +
+        "from blocks " + 
+        "order by number desc"
+
     let private fetchTransactionsSql = 
          "select convert(varchar(66), hash, 1) hash, " +
          "convert(varchar(42), token0Id, 1) token0Id, convert(varchar(42), token1Id, 1) token1Id, convert(varchar(66), amountIn, 1) amountIn, convert(varchar(66), amountOut, 1) amountOut , convert(varchar(66), blockNumber, 1) blockNumber, convert(varchar(66), nonce, 1) nonce " + 
@@ -158,6 +163,13 @@ module Db =
         async{
             return! dbQuery<Block> connection fetchBlocksSql None
                     |> Async.AwaitTask
+        }
+
+    let fetchLastRecordedBlockAsync connection =
+        async{
+            let! blocks = dbQuery<Block> connection fetchLastRecordedBlockSql None
+                          |> Async.AwaitTask
+            return Seq.last blocks
         }
 
     let addBlockAsync connection (block:Block) =

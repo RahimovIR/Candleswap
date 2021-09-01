@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using RedDuck.Candleswap.Candles.CSharp;
-using static RedDuck.Candleswap.Candles.Types;
+using static Domain.Types;
 
 namespace WebSocket.Uniswap.Helpers
 {

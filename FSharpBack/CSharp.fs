@@ -12,6 +12,8 @@ open System.Threading
 open System.Collections.Generic
 open Microsoft.Data.SqlClient
 open Domain
+open Indexer.Logic
+open System.Numerics
 
 type ISqlConnectionProvider =
     abstract GetConnection: unit -> SqlConnection
@@ -107,3 +109,23 @@ type CandleStorageService(sql: ISqlConnectionProvider) =
         member _.FetchPairOrCreateNewIfNotExists token0Id token1Id = 
             Db.fetchPairOrCreateNewIfNotExists connection token0Id token1Id |> Async.StartAsTask
 
+
+type IIndexerService =
+    abstract IndexNewBlockAsync: int -> Task 
+    abstract IndexInRangeParallel: 
+        BigInteger -> 
+        BigInteger -> 
+        BigInteger option -> 
+        Task
+
+type IndexerService(web3, sql:ISqlConnectionProvider, logger) = 
+    let connection = sql.GetConnection()
+
+    interface IIndexerService with
+        member _.IndexNewBlockAsync checkingForNewBlocksPeriod = 
+            indexNewBlocksAsync connection web3 logger checkingForNewBlocksPeriod 
+            |> Async.StartAsTask :> Task
+
+        member _.IndexInRangeParallel startBlock endBlock step =
+            indexInRangeParallel connection web3 logger startBlock endBlock step
+            |> Async.StartAsTask :> Task

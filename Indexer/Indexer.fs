@@ -10,6 +10,7 @@ open Domain.Types
 open Microsoft.Extensions.Logging
 open System
 open Dater
+open System.Threading.Tasks
 
 module Logic = 
 
@@ -123,7 +124,7 @@ module Logic =
                         let rec inner i j =
                             async{
                                 if j > 0I
-                                then indexInRangeAsync connection web3 logger 
+                                then indexInRangeAsync web3 connection logger 
                                                        i (i - step)
                                      |> Async.StartAsTask
                                      do! inner (i - step) (j - 1I)
@@ -133,7 +134,7 @@ module Logic =
 
                 do! loop()
 
-                do! indexInRangeAsync connection web3 logger startOfBlocksNotIndexedYet endBlock
+                do! indexInRangeAsync web3 connection logger startOfBlocksNotIndexedYet endBlock
         }
 
     let indexInTimeRangeAsync connection web3 logger startTime endTime =
@@ -142,4 +143,16 @@ module Logic =
             let! endBlock =  getBlockNumberByDateTimeOffsetAsync false web3 endTime
 
             do! indexInRangeAsync web3 connection logger startBlock.Value endBlock.Value
+        }
+
+    let indexNewBlocksAsync connection (web3:IWeb3) logger (checkingForNewBlocksPeriod:int) =
+        async{
+            let! lastRecordedBlock = Db.fetchLastRecordedBlockAsync connection
+            let! lastBlockInBlockchain = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
+                                         |> Async.AwaitTask
+
+            while true do 
+                do! indexInRangeParallel connection web3 logger lastBlockInBlockchain.Value 
+                                         (HexBigInteger lastRecordedBlock.number).Value None
+                do! Task.Delay(checkingForNewBlocksPeriod) |> Async.AwaitTask
         }

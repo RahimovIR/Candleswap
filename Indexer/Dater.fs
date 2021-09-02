@@ -129,18 +129,11 @@ module Dater =
                 return! findBestBlock date predictedBlock ifBlockAfterDate blockTime web3
         }
 
-    let convertToUnixTimestamp (date: DateTime) =
-        let origin =
-            new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-
-        let diff = date.ToUniversalTime() - origin
-        Math.Floor(diff.TotalSeconds)
-
-    let getBlockNumberByDateTimeOffsetAsync ifBlockAfterDate (web3: IWeb3) (date:DateTime) = 
+    let getBlockNumberByDateTimeAsync ifBlockAfterDate (web3: IWeb3) (date:DateTime) = 
         async{
             let! blockNumberTimestamp = (DateTimeOffset date).ToUnixTimeSeconds()
                                         |> BigInteger
-                                        |> getBlockByDateAsync false web3
+                                        |> getBlockByDateAsync ifBlockAfterDate web3
 
             return blockNumberTimestamp.number
         }

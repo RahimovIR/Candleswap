@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.FSharp.Core;
+using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
 using RedDuck.Candleswap.Candles.CSharp;
 using System;
@@ -39,28 +40,43 @@ namespace WebSocket.Uniswap.Background
 
         private async Task DoWork(CancellationToken cancellationToken)
         {
-            var lastBlockInBlockchain = await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+            //var lastBlockInBlockchain = await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+            
+            var startFrom = DateTime.UtcNow;
 
-            _indexerService.IndexInRangeParallel(lastBlockInBlockchain.Value,
+            var lastBlockNumberInBlockchain = await _logicService.GetBlockNumberByDateTimeAsync(false, startFrom);
+
+            var pancakeLauchDateTimestamp = new DateTime(2020, 9, 20, 0, 0, 0);
+            var tmp = new DateTime(2021, 9, 2, 10, 39, 0);
+
+            /*_indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
                                                  0,
-                                                 FSharpOption<BigInteger>.None);
+                                                 FSharpOption<BigInteger>.None);*/
 
-            _indexerService.IndexNewBlockAsync(3);
+            await Task.Delay(TimeSpan.FromSeconds(5));
 
-            var startFrom = DateTimeOffset.UtcNow.DateTime;
+            //_indexerService.IndexNewBlockAsync(3);
+
+
             foreach(var period in _defaultPeriods)
             {
-                await Task.Run(() => {
-                    _logicService.GetCandles(_ => { }, TimeSpan.FromSeconds(period), cancellationToken, startFrom);
+                var periods = _logicService.GetTimeSamples((startFrom, tmp), TimeSpan.FromSeconds(period));
+
+                var blockPeriods = new List<(HexBigInteger, HexBigInteger)>();
+                foreach(var (start, end) in periods)
+                {
+                    var startBlockNumber = await _logicService.GetBlockNumberByDateTimeAsync(false, start);
+                    var endBlockNumber = await _logicService.GetBlockNumberByDateTimeAsync(false, end);
+                    blockPeriods.Add((startBlockNumber, endBlockNumber));
+                }
+                var t = 0;
+                await _logicService.GetCandles(_ => { }, cancellationToken, blockPeriods);
+                /*await Task.Run(() => {
+                    _logicService.GetCandles(_ => { }, cancellationToken, blockPeriods);
                     _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
                                         cancellationToken);
-                });
+                });*/
             }
-
-            /*_logicService.GetCandles(_ => { }, TimeSpan.FromSeconds(period), cancellationToken,
-                                         startFrom);*/
-            /*_logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period), 
-                                    cancellationToken);*/
         }
 
     }

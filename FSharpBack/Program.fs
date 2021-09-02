@@ -23,6 +23,6 @@ let main args =
     //|> Async.RunSynchronously
 
 
-    Logic.getCandles connection (fun candle -> printfn "candle received" ) (TimeSpan.FromSeconds((float)period)) web3 CancellationToken.None startFrom
-    |> Async.RunSynchronously
+    (*Logic.getCandles connection (fun candle -> printfn "candle received" ) (TimeSpan.FromSeconds((float)period)) web3 CancellationToken.None startFrom
+    |> Async.RunSynchronously*)
     0

@@ -28,14 +28,19 @@ module Db =
 
     let private insertPairSql = "insert into pairs(token0Id, token1Id) values(@token0Id, @token1Id)"
 
-    let private fetchBlocksSql = "select convert(varchar(66), number, 1), convert(varchar(66), timestamp, 1) from blocks"
+    let private fetchBlocksSql = "select convert(varchar(66), number, 1) number, convert(varchar(66), timestamp, 1) timestamp from blocks"
 
     let private insertBlockSql = "insert into blocks(number, timestamp) values(convert(varbinary(32), @number, 1), convert(varbinary(32), @timestamp, 1))"
 
     let private fetchLastRecordedBlockSql = 
-        "select convert(varchar(66), number, 1), convert(varchar(66), timestamp, 1) " +
+        "select top 1 convert(varchar(66), number, 1) number, convert(varchar(66), timestamp, 1) timestamp " +
         "from blocks " + 
         "order by number desc"
+
+    let private fetchBlockByNumberSql = 
+        "select convert(varchar(66), number, 1) number, convert(varchar(66), timestamp, 1) timestamp " +
+        "from blocks " + 
+        "where number = convert(varbinary(32), @number, 1)"
 
     let private fetchTransactionsSql = 
          "select convert(varchar(66), hash, 1) hash, " +
@@ -174,6 +179,15 @@ module Db =
             let! blocks = dbQuery<Block> connection fetchLastRecordedBlockSql None
                           |> Async.AwaitTask
             return Seq.last blocks
+        }
+
+    let fetchBlockByNumber connection (number:HexBigInteger) =
+        async{
+            let param = handleHexStringBeforeConvertingToVarbinary number.HexValue
+
+            let! blocks = dbQuery<Block> connection fetchBlockByNumberSql (Some(dict ["number" => param]))
+                          |> Async.AwaitTask
+            return blocks
         }
 
     let addBlockAsync connection (block:Block) =

@@ -14,6 +14,8 @@ open Microsoft.Data.SqlClient
 open Domain
 open Indexer.Logic
 open System.Numerics
+open Nethereum.Hex.HexTypes
+open Indexer
 
 type ISqlConnectionProvider =
     abstract GetConnection: unit -> SqlConnection
@@ -43,13 +45,23 @@ type ILogicService =
 
     abstract GetCandles:
         callback: Action<struct (Pair*DbCandle)> ->
-        resolutionTime: TimeSpan ->
         cancelToken: CancellationToken ->
-        startFrom: DateTime -> 
+        blockPeriods: struct (HexBigInteger*HexBigInteger) seq-> 
         Task
+
+    abstract GetTimeSamples:
+        period: struct (DateTime*DateTime) ->
+        rate: TimeSpan -> 
+        List<struct (DateTime*DateTime)>
+
+    abstract GetBlockNumberByDateTimeAsync:
+        ifBlockAfterDate: bool -> 
+        date: DateTime -> 
+        Task<HexBigInteger>
 
 type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) = 
     let toRefTuple = fun struct (a, b) -> (a, b)
+    let toStructTuple = fun (a, b) -> struct(a, b)
     let connection = sqlite.GetConnection()
 
     interface ILogicService with
@@ -62,11 +74,27 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
         
         member _.GetCandle callback resolutionTime cancelToken =
             let callback str = callback.Invoke(str)
-            Logic.getCandle connection callback resolutionTime web3 cancelToken |> Async.StartAsTask :> Task
+            Logic.getCandle connection web3 callback resolutionTime cancelToken |> Async.StartAsTask :> Task
 
-        member _.GetCandles callback resolutionTime cancelToken startFrom= 
+        member _.GetCandles callback cancelToken blockPeriods = 
             let callback str = callback.Invoke(str)
-            Logic.getCandles connection callback resolutionTime web3 cancelToken startFrom |> Async.StartAsTask :> Task
+            
+            let newBlockPeriods = blockPeriods
+                                  |> Seq.map (fun b -> toRefTuple b)
+
+            Logic.getCandles connection callback web3 cancelToken newBlockPeriods 
+            |> Async.StartAsTask :> Task
+
+        member _.GetTimeSamples period rate =
+            let newPeriod = toRefTuple period
+            let result = Logic.getTimeSamples newPeriod rate
+                         |> List.map(fun t -> toStructTuple t)
+            new List<struct(DateTime*DateTime)>(result)
+
+        member _.GetBlockNumberByDateTimeAsync ifBlockAfterDate date = 
+            Dater.getBlockNumberByDateTimeAsync ifBlockAfterDate web3 date |> Async.StartAsTask
+
+
 
 module Logic =
     [<Literal>]

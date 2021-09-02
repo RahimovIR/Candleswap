@@ -70,15 +70,27 @@ module Logic =
 
     let buildCandleAsync
         connection
-        (web3: IWeb3)
-        startTime
-        endTime
+        startBlockNumber
+        endBlockNumber
         =
+
+        let rec getBlockFromDbOrDelayWhileNotIndexedAsync connection blockNumber = 
+            async{
+                let! blocks = Db.fetchBlockByNumber connection blockNumber
+                match Seq.tryLast blocks with 
+                | Some block -> return block
+                | None -> do! Task.Delay(1000) |> Async.AwaitTask
+                          return! getBlockFromDbOrDelayWhileNotIndexedAsync connection blockNumber      
+            }
+
         async {
             printfn "New pass"
 
-            let! startBlockNumber = getBlockNumberByDateTimeOffsetAsync false web3 startTime
-            let! endBlockNumber = getBlockNumberByDateTimeOffsetAsync false web3 endTime
+            let! startBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection startBlockNumber
+                              
+            let! endBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection endBlockNumber
+
+            let resolution = (HexBigInteger startBlock.timestamp).Value - (HexBigInteger endBlock.timestamp).Value 
 
             let! transactions = Db.fetchTransactionsBetweenBlocks connection startBlockNumber endBlockNumber
                                 
@@ -90,8 +102,8 @@ module Logic =
                            async{
                                let (pair, candle) = pairWithCandle
                                let! pairFromDb = Db.fetchPairAsync connection pair.token0Id pair.token1Id
-                               let dbCandle = { datetime = (DateTimeOffset startTime).ToUnixTimeSeconds()
-                                                resolutionSeconds = (int)(startTime - endTime).TotalSeconds
+                               let dbCandle = { datetime = (int64)(HexBigInteger startBlock.timestamp).Value
+                                                resolutionSeconds = (int)resolution
                                                 pairId = pairFromDb.Value.id 
                                                 _open = candle._open.ToString()
                                                 high = candle.high.ToString()
@@ -118,27 +130,30 @@ module Logic =
 
     let buildCandleSendCallbackAndWriteToDBAsync
         connection
-        (resolutionTime: TimeSpan)
         callback
-        (web3: IWeb3)
-        (currentTime: DateTime)
+        startBlockNumber
+        endBlockNumber
         =
         async {
-            let endTime = currentTime.Subtract(resolutionTime)
-
-            let! pairsWithDbCandles = buildCandleAsync connection web3 currentTime endTime
+            let! pairsWithDbCandles = buildCandleAsync connection startBlockNumber endBlockNumber
             return! sendCallbackAndWriteToDBAsync connection pairsWithDbCandles callback
         }
 
-    let getCandle connection callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) =
+    let getCandle connection (web3:IWeb3) callback (resolutionTime: TimeSpan) (cancelToken:CancellationToken) =
         async{
             try
-                let mutable currentTime = DateTime.UtcNow
                 while cancelToken.IsCancellationRequested <> true do
                     let timer = new System.Diagnostics.Stopwatch()
                     timer.Start()
-                    do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime callback web3 currentTime
-                    currentTime <- currentTime + resolutionTime
+                    
+                    let! lastRecordedBlock = Db.fetchLastRecordedBlockAsync connection
+                    let lastRecordedBlocNumber = HexBigInteger lastRecordedBlock.number
+                    let! lastBlockNumberInBlockchain = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
+                                                       |> Async.AwaitTask
+
+                    do! buildCandleSendCallbackAndWriteToDBAsync connection callback
+                                                                 lastBlockNumberInBlockchain
+                                                                 lastRecordedBlocNumber
                     //do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
                     do! Task.Delay(resolutionTime) |> Async.AwaitTask
                 printfn "Operation was canceled!"
@@ -147,31 +162,41 @@ module Logic =
         }
 
     let firstUniswapExchangeTimestamp =
-        DateTime(2018, 11, 2, 10, 33, 56).ToUniversalTime()
+        DateTime(2018, 11, 2, 10, 33, 56)
 
-    let pancakeLauchDateTimestamp = 
-        DateTime(2020, 9, 20, 0, 0, 0).ToUniversalTime()
-
-    let getTimeSamples (period: DateTime * DateTime) rate =
-        let rec inner (a: DateTime, b) samples =
-            if a >= b then 
+    let getTimeSamples (period: DateTime * DateTime) (rate:TimeSpan) =
+        let rec inner (start: DateTime, _end) samples =
+            if start <= _end then 
                 samples
             else
-                inner (a.Add rate, b) (a :: samples)
+                let newStart = start.Subtract rate
+                let newEnd = _end.Subtract rate
+                //inner (newStart, _end) ( samples @ [(start, newEnd)])
+                inner (newStart, _end) ((start, newEnd) :: samples)
         inner period []
+        |> List.rev
 
-    let getCandles connection callback (resolutionTime: TimeSpan) (web3: IWeb3) (cancelToken:CancellationToken) startFrom =
+    let getCandles connection callback (web3: IWeb3) (cancelToken:CancellationToken) (blockPeriods:(HexBigInteger*HexBigInteger) seq) =
+        
+        let dateTimeToHex (dateTime:DateTime) = 
+            (DateTimeOffset dateTime).ToUnixTimeSeconds()
+            |> BigInteger
+            |> HexBigInteger
+        
         async{
             try
-                let b = startFrom
-                let a = pancakeLauchDateTimestamp
-                let timeSamples = getTimeSamples(a, b) resolutionTime
+                //let timeSamples = getTimeSamples(startFrom, pancakeLauchDateTimestamp) resolutionTime
 
-                timeSamples
-                |> List.takeWhile (
-                   fun t -> async{
+                blockPeriods
+                |> Seq.takeWhile (
+                   fun (startBlockNumber, endBlockNumber) -> 
+                            async{
                                 try
-                                    do! buildCandleSendCallbackAndWriteToDBAsync connection resolutionTime callback web3 t
+                                    //let! startBlockNumber =  getBlockNumberByDateTimeAsync false web3 start 
+                                    //let! endBlockNumber = getBlockNumberByDateTimeAsync false web3 _end
+                                    do! buildCandleSendCallbackAndWriteToDBAsync connection callback 
+                                                                                 startBlockNumber
+                                                                                 endBlockNumber
                                 with
                                 | ex -> ex.ToString() |> printfn "%s"
                             } |> Async.RunSynchronously

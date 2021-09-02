@@ -143,7 +143,7 @@ module Logic =
             let! endBlock =  getBlockNumberByDateTimeOffsetAsync false web3 endTime
 
             do! indexInRangeAsync web3 connection logger startBlock.Value endBlock.Value
-        }*)
+        }*) 
 
     let indexNewBlocksAsync connection (web3:IWeb3) logger (checkingForNewBlocksPeriod:int) =
         async{

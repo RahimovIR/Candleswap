@@ -46,7 +46,8 @@ type ILogicService =
     abstract GetCandles:
         callback: Action<struct (Pair*DbCandle)> ->
         cancelToken: CancellationToken ->
-        blockPeriods: struct (HexBigInteger*HexBigInteger) seq-> 
+        period: struct (DateTime*DateTime) -> 
+        resolution: TimeSpan ->
         Task
 
     abstract GetTimeSamples:
@@ -76,13 +77,12 @@ type LogicService(web3: IWeb3, sqlite: ISqlConnectionProvider) =
             let callback str = callback.Invoke(str)
             Logic.getCandle connection web3 callback resolutionTime cancelToken |> Async.StartAsTask :> Task
 
-        member _.GetCandles callback cancelToken blockPeriods = 
+        member _.GetCandles callback cancelToken period resolution = 
             let callback str = callback.Invoke(str)
             
-            let newBlockPeriods = blockPeriods
-                                  |> Seq.map (fun b -> toRefTuple b)
+            let newPeriod = toRefTuple period 
 
-            Logic.getCandles connection callback web3 cancelToken newBlockPeriods 
+            Logic.getCandles connection callback web3 cancelToken newPeriod resolution 
             |> Async.StartAsTask :> Task
 
         member _.GetTimeSamples period rate =

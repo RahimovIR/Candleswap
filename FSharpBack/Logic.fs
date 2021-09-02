@@ -79,7 +79,8 @@ module Logic =
                 let! blocks = Db.fetchBlockByNumber connection blockNumber
                 match Seq.tryLast blocks with 
                 | Some block -> return block
-                | None -> do! Task.Delay(1000) |> Async.AwaitTask
+                | None -> do! Task.Delay(10000) |> Async.AwaitTask
+                          printfn "!!!!!!"
                           return! getBlockFromDbOrDelayWhileNotIndexedAsync connection blockNumber      
             }
 
@@ -170,13 +171,13 @@ module Logic =
                 samples
             else
                 let newStart = start.Subtract rate
-                let newEnd = _end.Subtract rate
+                //let newEnd = _end.Subtract rate
                 //inner (newStart, _end) ( samples @ [(start, newEnd)])
-                inner (newStart, _end) ((start, newEnd) :: samples)
+                inner (newStart, _end) ((start, newStart) :: samples)
         inner period []
         |> List.rev
 
-    let getCandles connection callback (web3: IWeb3) (cancelToken:CancellationToken) (blockPeriods:(HexBigInteger*HexBigInteger) seq) =
+    let getCandles connection callback (web3: IWeb3) (cancelToken:CancellationToken) period resolution =
         
         let dateTimeToHex (dateTime:DateTime) = 
             (DateTimeOffset dateTime).ToUnixTimeSeconds()
@@ -185,23 +186,36 @@ module Logic =
         
         async{
             try
+
+                let timeSamples = getTimeSamples period resolution
                 //let timeSamples = getTimeSamples(startFrom, pancakeLauchDateTimestamp) resolutionTime
 
-                blockPeriods
+                (*timeSamples
                 |> Seq.takeWhile (
-                   fun (startBlockNumber, endBlockNumber) -> 
+                   fun (start, _end) -> 
                             async{
                                 try
-                                    //let! startBlockNumber =  getBlockNumberByDateTimeAsync false web3 start 
-                                    //let! endBlockNumber = getBlockNumberByDateTimeAsync false web3 _end
+                                    let! startBlockNumber =  getBlockNumberByDateTimeAsync false web3 start 
+                                    let! endBlockNumber = getBlockNumberByDateTimeAsync false web3 _end
                                     do! buildCandleSendCallbackAndWriteToDBAsync connection callback 
                                                                                  startBlockNumber
                                                                                  endBlockNumber
                                 with
                                 | ex -> ex.ToString() |> printfn "%s"
                             } |> Async.RunSynchronously
-                            cancelToken.IsCancellationRequested <> true
-                   ) |> ignore
+                            false
+                   ) |> ignore*)
+
+                for (start, _end) in timeSamples do
+                    try
+                        let! startBlockNumber =  getBlockNumberByDateTimeAsync false web3 start 
+                        let! endBlockNumber = getBlockNumberByDateTimeAsync false web3 _end
+                        do! buildCandleSendCallbackAndWriteToDBAsync connection callback 
+                                                                     startBlockNumber
+                                                                     endBlockNumber
+                    with
+                    | ex -> ex.ToString() |> printfn "%s"
+
                 if cancelToken.IsCancellationRequested = true
                 then printfn "Operation was canceled!"
                 else printfn "Processing completed successfully"

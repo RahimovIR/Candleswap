@@ -25,11 +25,14 @@ module Logic =
                        |> Array.exists (fun func -> 
                        transaction.Input.Contains(func)))
 
-        let map (transaction: Transaction) =
+        let rec map (transaction: Transaction) =
             async {
-                return!
-                    web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
-                    |> Async.AwaitTask
+                let! receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
+                              |> Async.AwaitTask
+                if(receipt <> null)
+                then return receipt
+                else do! Task.Delay(1000) |> Async.AwaitTask
+                     return! map transaction
             }
 
         let filterSuccessfulTranscations transactionsWithReceipts =
@@ -53,12 +56,22 @@ module Logic =
             |> Option.get
             |> Option.map (fun f -> (f transaction receipt, transaction))
 
+        let rec getBlockOrWaitAsync (web3:IWeb3) (blockNumber:BigInteger) = 
+            async{
+                let! block = HexBigInteger blockNumber
+                             |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                             |> Async.AwaitTask
+                if block <> null
+                then return block
+                else printfn "!!!!!!"
+                     do! Task.Delay(2000) |> Async.AwaitTask
+                     return! getBlockOrWaitAsync web3 blockNumber     
+            }
+
         async{
             //logger.LogInformation($"Start indexing {blockNumber} block")
             printfn $"Start indexing {blockNumber} block"
-            let! block = HexBigInteger blockNumber
-                         |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
-                         |> Async.AwaitTask
+            let! block = getBlockOrWaitAsync web3 blockNumber
 
             do! Db.addBlockAsync connection {number = (HexBigInteger blockNumber).HexValue 
                                              timestamp = block.Timestamp.HexValue}
@@ -145,10 +158,21 @@ module Logic =
             do! indexInRangeAsync web3 connection logger startBlock.Value endBlock.Value
         }*) 
 
+    let rec getLastRecordedBlockOrWaitWhileNotIndexed connection = 
+        async{
+            let! blocks = Db.fetchLastRecordedBlockAsync connection
+            match Seq.tryLast blocks with 
+            | Some block -> return block
+            | None -> do! Task.Delay(5000) |> Async.AwaitTask
+                      printfn "!!!!!!"
+                      return! getLastRecordedBlockOrWaitWhileNotIndexed connection      
+        }
+
     let indexNewBlocksAsync connection (web3:IWeb3) logger (checkingForNewBlocksPeriod:int) =
+        
         async{
             while true do
-                let! lastRecordedBlock = Db.fetchLastRecordedBlockAsync connection
+                let! lastRecordedBlock = getLastRecordedBlockOrWaitWhileNotIndexed connection
                 let! lastBlockInBlockchain = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
                                              |> Async.AwaitTask
                 do! indexInRangeParallel connection web3 logger lastBlockInBlockchain.Value 

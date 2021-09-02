@@ -47,35 +47,24 @@ namespace WebSocket.Uniswap.Background
             var lastBlockNumberInBlockchain = await _logicService.GetBlockNumberByDateTimeAsync(false, startFrom);
 
             var pancakeLauchDateTimestamp = new DateTime(2020, 9, 20, 0, 0, 0);
-            //var tmp = new DateTime(2021, 9, 2, 11, 46, 0);
 
             _indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
                                                  0,
                                                  FSharpOption<BigInteger>.None);
 
-            //_indexerService.IndexNewBlockAsync(3);
+            _indexerService.IndexNewBlockAsync(5);
+
+            foreach (var period in _defaultPeriods)
+                 _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
+                    cancellationToken);
+
             foreach(var period in _defaultPeriods)
             {
-                await _logicService.GetCandles(WebSocketConnection.OnCandleUpdateReceived, cancellationToken, 
+                await _logicService.GetCandles(_ => { }, cancellationToken, 
                                          (startFrom, pancakeLauchDateTimestamp), TimeSpan.FromSeconds(period));
             }
-            /*foreach(var period in _defaultPeriods)
-            {
-                var periods = _logicService.GetTimeSamples((startFrom, tmp), TimeSpan.FromSeconds(period));
 
-                var blockPeriods = new List<(HexBigInteger, HexBigInteger)>();
-                foreach(var (start, end) in periods)
-                {
-                    var startBlockNumber = await _logicService.GetBlockNumberByDateTimeAsync(false, start);
-                    var endBlockNumber = await _logicService.GetBlockNumberByDateTimeAsync(false, end);
-                    blockPeriods.Add((startBlockNumber, endBlockNumber));
-                }
-                await _logicService.GetCandles(_ => { }, cancellationToken, blockPeriods);*/
-                /*await Task.Run(() => {
-                    _logicService.GetCandles(_ => { }, cancellationToken, blockPeriods);
-                    _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
-                                        cancellationToken);
-                });*/
+
         }
 
     }

@@ -178,7 +178,7 @@ module Db =
         async{
             let! blocks = dbQuery<Block> connection fetchLastRecordedBlockSql None
                           |> Async.AwaitTask
-            return Seq.last blocks
+            return blocks
         }
 
     let fetchBlockByNumber connection (number:HexBigInteger) =

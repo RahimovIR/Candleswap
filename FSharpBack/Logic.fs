@@ -72,6 +72,7 @@ module Logic =
         connection
         startBlockNumber
         endBlockNumber
+        resolution
         =
 
         let rec getBlockFromDbOrDelayWhileNotIndexedAsync connection blockNumber = 
@@ -89,9 +90,7 @@ module Logic =
 
             let! startBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection startBlockNumber
                               
-            let! endBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection endBlockNumber
-
-            let resolution = (HexBigInteger startBlock.timestamp).Value - (HexBigInteger endBlock.timestamp).Value 
+            let! endBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection endBlockNumber 
 
             let! transactions = Db.fetchTransactionsBetweenBlocks connection startBlockNumber endBlockNumber
                                 
@@ -104,7 +103,7 @@ module Logic =
                                let (pair, candle) = pairWithCandle
                                let! pairFromDb = Db.fetchPairAsync connection pair.token0Id pair.token1Id
                                let dbCandle = { datetime = (int64)(HexBigInteger startBlock.timestamp).Value
-                                                resolutionSeconds = (int)resolution
+                                                resolutionSeconds = resolution
                                                 pairId = pairFromDb.Value.id 
                                                 _open = candle._open.ToString()
                                                 high = candle.high.ToString()
@@ -134,27 +133,32 @@ module Logic =
         callback
         startBlockNumber
         endBlockNumber
+        resolution
         =
         async {
-            let! pairsWithDbCandles = buildCandleAsync connection startBlockNumber endBlockNumber
+            let! pairsWithDbCandles = buildCandleAsync connection startBlockNumber endBlockNumber resolution
             return! sendCallbackAndWriteToDBAsync connection pairsWithDbCandles callback
         }
 
     let getCandle connection (web3:IWeb3) callback (resolutionTime: TimeSpan) (cancelToken:CancellationToken) =
+       
+        
         async{
             try
                 while cancelToken.IsCancellationRequested <> true do
                     let timer = new System.Diagnostics.Stopwatch()
                     timer.Start()
                     
-                    let! lastRecordedBlock = Db.fetchLastRecordedBlockAsync connection
+                    let! lastRecordedBlock = Indexer.Logic.getLastRecordedBlockOrWaitWhileNotIndexed connection
                     let lastRecordedBlocNumber = HexBigInteger lastRecordedBlock.number
                     let! lastBlockNumberInBlockchain = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
                                                        |> Async.AwaitTask
 
-                    do! buildCandleSendCallbackAndWriteToDBAsync connection callback
-                                                                 lastBlockNumberInBlockchain
-                                                                 lastRecordedBlocNumber
+                    do! (int)resolutionTime.TotalSeconds
+                        |> buildCandleSendCallbackAndWriteToDBAsync connection callback
+                                                                    lastBlockNumberInBlockchain
+                                                                    lastRecordedBlocNumber
+                                                                 
                     //do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
                     do! Task.Delay(resolutionTime) |> Async.AwaitTask
                 printfn "Operation was canceled!"
@@ -178,7 +182,7 @@ module Logic =
         |> List.rev
 
     let getCandles connection callback (web3: IWeb3) (cancelToken:CancellationToken) period resolution =
-        
+
         let dateTimeToHex (dateTime:DateTime) = 
             (DateTimeOffset dateTime).ToUnixTimeSeconds()
             |> BigInteger
@@ -213,6 +217,7 @@ module Logic =
                         do! buildCandleSendCallbackAndWriteToDBAsync connection callback 
                                                                      startBlockNumber
                                                                      endBlockNumber
+                                                                     ((int)resolution.TotalSeconds)
                     with
                     | ex -> ex.ToString() |> printfn "%s"
 

@@ -103,6 +103,9 @@ module Logic =
                       blockNumber = (HexBigInteger blockNumber).HexValue
                       nonce = transaction.Nonce.HexValue}
                 do! Db.addTransactionAsync connection dbTransaction
+                do! Db.addPairAsync connection { id = 0L;
+                                                token0Id = token0Id; 
+                                                token1Id = token1Id}
         }                                  
 
     let indexInRangeAsync web3 connection (logger:ILogger) startBlock endBlock = 

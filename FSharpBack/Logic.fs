@@ -59,9 +59,9 @@ module Logic =
                                |> Seq.groupBy (fun (_, _, pair) -> pair)
 
             
-            do! pairsAmounts
+            (*do! pairsAmounts
                 |> Seq.map (fun (pair, _) -> pair)
-                |> Db.addPairsIfNotExistAsync connection            
+                |> Db.addPairsIfNotExistAsync connection   *)     
 
             let pairsCandles = pairsAmounts
                                |> Seq.map (fun (pair, list) -> (pair, calculateCandle list))

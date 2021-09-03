@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
+using Nethereum.JsonRpc.Client;
 using Nethereum.Web3;
 using RedDuck.Candleswap.Candles.CSharp;
 using WebSocket.Uniswap.Background;

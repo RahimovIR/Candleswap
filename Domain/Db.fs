@@ -26,6 +26,11 @@ module Db =
 
     let private fetchPairsSql = "select * from pairs"
 
+    let private fetchPairSql = 
+        "select * " +
+        "from pairs " + 
+        "where upper(token0Id) = upper(@token0Id) and upper(token1Id) = upper(@token1Id)"
+
     let private insertPairSql = "insert into pairs(token0Id, token1Id) values(@token0Id, @token1Id)"
 
     let private fetchBlocksSql = "select convert(varchar(66), number, 1) number, convert(varchar(66), timestamp, 1) timestamp from blocks"
@@ -130,21 +135,27 @@ module Db =
                     |> Async.AwaitTask
         }
 
-    let addPairAsync connection pair = 
-        async{
-            let! rowsChanged = dbExecute connection insertPairSql pair
-                               |> Async.AwaitTask
-            printfn "records added: %i" rowsChanged
-        }
-
     let fetchPairAsync connection (token0Id:string) (token1Id:string) = 
         async{
-            let! pairs = fetchPairsAsync connection
-            return pairs 
-                   |> Seq.tryFind 
-                      (fun pair -> 
-                           String.Compare(pair.token0Id, token0Id, true) = 0 && 
-                           String.Compare(pair.token1Id, token1Id, true) = 0)
+            
+            let! pairs = dict ["token0Id" => token0Id
+                               "token1Id" => token1Id ]
+                         |> Some
+                         |> dbQuery<Pair> connection fetchPairSql
+                         |> Async.AwaitTask
+
+            return Seq.tryLast pairs
+        }
+
+    let addPairAsync connection (pair:Pair) = 
+        async{
+            let! pairFromDb = fetchPairAsync connection pair.token0Id pair.token1Id
+
+            match pairFromDb with 
+            | Some _ -> printfn "such pair is already registered"
+            | None -> let! rowsChanged = dbExecute connection insertPairSql pair
+                                         |> Async.AwaitTask
+                      printfn "records added: %i" rowsChanged
         }
 
     let fetchPairOrCreateNewIfNotExists connection token0Id token1Id = 
@@ -159,13 +170,9 @@ module Db =
 
     let addPairsIfNotExistAsync connection (pairs:Pair seq) = 
         async{
-            let! pairsFromDb = fetchPairsAsync connection
+            //let! pairsFromDb = fetchPairsAsync connection
             for pair in pairs do
-                let pairFromDb = 
-                    pairsFromDb
-                    |> Seq.tryFind(fun p -> p.token0Id = pair.token0Id && p.token1Id = pair.token1Id)
-                if pairFromDb.IsNone
-                then do! addPairAsync connection pair
+                do! addPairAsync connection pair
         }
 
     let fetchBlocksAsync connection = 

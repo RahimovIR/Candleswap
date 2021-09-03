@@ -24,6 +24,7 @@ module Types =
           close: string
           volume: int }
 
+    [<CLIMutable>]
     type Pair =
         { id: int64
           token0Id: string

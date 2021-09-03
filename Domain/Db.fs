@@ -24,14 +24,18 @@ module Db =
         + "from candles"
         + "where datetime = @datetime"
 
-    let private fetchPairsSql = "select * from pairs"
+    let private fetchPairsSql = 
+        "select id, convert(varchar(42), token0Id, 1) token0Id, convert(varchar(42), token1Id, 1) token1Id " +
+        "from pairs"
 
     let private fetchPairSql = 
-        "select * " +
+        "select id, convert(varchar(42), token0Id, 1) token0Id, convert(varchar(42), token1Id, 1) token1Id " +
         "from pairs " + 
-        "where upper(token0Id) = upper(@token0Id) and upper(token1Id) = upper(@token1Id)"
+        "where token0Id = convert(varbinary(20), @token0Id, 1) and token1Id = convert(varbinary(20), @token1Id, 1)"
 
-    let private insertPairSql = "insert into pairs(token0Id, token1Id) values(@token0Id, @token1Id)"
+    let private insertPairSql = 
+        "insert into pairs(token0Id, token1Id) " + 
+        "values(convert(varbinary(20), @token0Id, 1) , convert(varbinary(20), @token1Id, 1))"
 
     let private fetchBlocksSql = "select convert(varchar(66), number, 1) number, convert(varchar(66), timestamp, 1) timestamp from blocks"
 
@@ -138,8 +142,11 @@ module Db =
     let fetchPairAsync connection (token0Id:string) (token1Id:string) = 
         async{
             
-            let! pairs = dict ["token0Id" => token0Id
-                               "token1Id" => token1Id ]
+            let firstParam = handleHexStringBeforeConvertingToVarbinary token0Id
+            let secondParam = handleHexStringBeforeConvertingToVarbinary token1Id
+
+            let! pairs = dict ["token0Id" => firstParam
+                               "token1Id" => secondParam ]
                          |> Some
                          |> dbQuery<Pair> connection fetchPairSql
                          |> Async.AwaitTask
@@ -151,9 +158,13 @@ module Db =
         async{
             let! pairFromDb = fetchPairAsync connection pair.token0Id pair.token1Id
 
+            let record = { id = 0L;
+                           token0Id = handleHexStringBeforeConvertingToVarbinary pair.token0Id;
+                           token1Id = handleHexStringBeforeConvertingToVarbinary pair.token1Id}
+
             match pairFromDb with 
             | Some _ -> printfn "such pair is already registered"
-            | None -> let! rowsChanged = dbExecute connection insertPairSql pair
+            | None -> let! rowsChanged = dbExecute connection insertPairSql record
                                          |> Async.AwaitTask
                       printfn "records added: %i" rowsChanged
         }

@@ -175,8 +175,7 @@ module Logic =
                 samples
             else
                 let newStart = start.Subtract rate
-                //let newEnd = _end.Subtract rate
-                //inner (newStart, _end) ( samples @ [(start, newEnd)])
+
                 inner (newStart, _end) ((start, newStart) :: samples)
         inner period []
         |> List.rev
@@ -192,23 +191,6 @@ module Logic =
             try
 
                 let timeSamples = getTimeSamples period resolution
-                //let timeSamples = getTimeSamples(startFrom, pancakeLauchDateTimestamp) resolutionTime
-
-                (*timeSamples
-                |> Seq.takeWhile (
-                   fun (start, _end) -> 
-                            async{
-                                try
-                                    let! startBlockNumber =  getBlockNumberByDateTimeAsync false web3 start 
-                                    let! endBlockNumber = getBlockNumberByDateTimeAsync false web3 _end
-                                    do! buildCandleSendCallbackAndWriteToDBAsync connection callback 
-                                                                                 startBlockNumber
-                                                                                 endBlockNumber
-                                with
-                                | ex -> ex.ToString() |> printfn "%s"
-                            } |> Async.RunSynchronously
-                            false
-                   ) |> ignore*)
 
                 for (start, _end) in timeSamples do
                     try

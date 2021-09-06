@@ -19,6 +19,7 @@ module Dater =
         async {
             let! block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockNumber)
                          |> Async.AwaitTask
+            let t = timestamp
             return {number = blockNumber
                     timestamp = block.Timestamp}
         }
@@ -129,10 +130,13 @@ module Dater =
                 return! findBestBlock date predictedBlock ifBlockAfterDate blockTime web3
         }
 
+    let dateTimeToEpoch date = 
+        let t = date - DateTime(1970, 1, 1)
+        t.TotalSeconds |> BigInteger
+
     let getBlockNumberByDateTimeAsync ifBlockAfterDate (web3: IWeb3) (date:DateTime) = 
         async{
-            let! blockNumberTimestamp = (DateTimeOffset date).ToUnixTimeSeconds()
-                                        |> BigInteger
+            let! blockNumberTimestamp = dateTimeToEpoch date
                                         |> getBlockByDateAsync ifBlockAfterDate web3
 
             return blockNumberTimestamp.number

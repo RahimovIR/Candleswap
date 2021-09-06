@@ -11,6 +11,7 @@ open Microsoft.Extensions.Logging
 open System
 open Dater
 open System.Threading.Tasks
+open System.Threading
 
 module Logic = 
 
@@ -31,7 +32,9 @@ module Logic =
                               |> Async.AwaitTask
                 if(receipt <> null)
                 then return receipt
-                else do! Task.Delay(1000) |> Async.AwaitTask
+                else printfn "Wait receipt"
+                     do! Task.Delay(1000) |> Async.AwaitTask
+                     //Thread.Sleep(1000)
                      return! map transaction
             }
 
@@ -63,8 +66,9 @@ module Logic =
                              |> Async.AwaitTask
                 if block <> null
                 then return block
-                else printfn "!!!!!!"
+                else printfn "Wait block"
                      do! Task.Delay(2000) |> Async.AwaitTask
+                     //Thread.Sleep(2000)
                      return! getBlockOrWaitAsync web3 blockNumber     
             }
 
@@ -166,8 +170,9 @@ module Logic =
             let! blocks = Db.fetchLastRecordedBlockAsync connection
             match Seq.tryLast blocks with 
             | Some block -> return block
-            | None -> do! Task.Delay(5000) |> Async.AwaitTask
-                      printfn "!!!!!!"
+            | None -> printfn "Wait while last recorded block not indexed"
+                      do! Task.Delay(5000) |> Async.AwaitTask
+                      //Thread.Sleep(5000)
                       return! getLastRecordedBlockOrWaitWhileNotIndexed connection      
         }
 
@@ -181,4 +186,5 @@ module Logic =
                 do! indexInRangeParallel connection web3 logger lastBlockInBlockchain.Value 
                                          (HexBigInteger lastRecordedBlock.number).Value None
                 do! Task.Delay(checkingForNewBlocksPeriod) |> Async.AwaitTask
+                //Thread.Sleep(checkingForNewBlocksPeriod)
         }

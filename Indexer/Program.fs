@@ -22,11 +22,9 @@ let main argv =
 
     let logger = new Logger<DbCandle>(new LoggerFactory())
 
-    let t = fetchPairAsync connection "" "" |> Async.RunSynchronously
-
     let date = DateTime (2021, 9, 2, 0, 8, 25)
     async{
-        let! t = getBlockNumberByDateTimeAsync false web3 date
+        let! t = getBlockByDateAsync false web3 1630916116I
         0
     } |> Async.RunSynchronously
 

@@ -64,7 +64,7 @@ namespace WebSocket.Uniswap.Controllers
                 await _candleStorage.FetchCandlesAsync(pair.id, periodSeconds, startTime.Value, 
                                                        endTime.Value, limit.Value);
 
-            return !candles.Any() ? BadRequest("There is no any candle for these tokens with such period in this interval") : candles;
+            return candles;
         }
     }
 }

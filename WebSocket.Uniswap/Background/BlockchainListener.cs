@@ -35,7 +35,7 @@ namespace WebSocket.Uniswap.Background
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Indexer running.");
-            DoWork(cancellationToken);
+            await DoWork(cancellationToken);
         }
 
         private async Task DoWork(CancellationToken cancellationToken)
@@ -48,19 +48,19 @@ namespace WebSocket.Uniswap.Background
 
             var pancakeLauchDateTimestamp = new DateTime(2020, 9, 20, 0, 0, 0);
 
-            _indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
+             _indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
                                                  0,
                                                  FSharpOption<BigInteger>.None);
 
-            _indexerService.IndexNewBlockAsync(5);
+             _indexerService.IndexNewBlockAsync(5);
 
             foreach (var period in _defaultPeriods)
-                 _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
+                _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
                     cancellationToken);
 
             foreach(var period in _defaultPeriods)
             {
-                await _logicService.GetCandles(_ => { }, cancellationToken, 
+                _logicService.GetCandles(_ => { }, cancellationToken, 
                                          (startFrom, pancakeLauchDateTimestamp), TimeSpan.FromSeconds(period));
             }
 

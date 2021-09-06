@@ -80,8 +80,9 @@ module Logic =
                 let! blocks = Db.fetchBlockByNumber connection blockNumber
                 match Seq.tryLast blocks with 
                 | Some block -> return block
-                | None -> do! Task.Delay(10000) |> Async.AwaitTask
-                          printfn "!!!!!!"
+                | None -> printfn "Wait block"
+                          do! Task.Delay(10000) |> Async.AwaitTask
+                          //Thread.Sleep(10000)
                           return! getBlockFromDbOrDelayWhileNotIndexedAsync connection blockNumber      
             }
 
@@ -160,6 +161,8 @@ module Logic =
                                                                     lastRecordedBlocNumber
                                                                  
                     //do! Task.Delay(resolutionTime - timer.Elapsed) |> Async.AwaitTask
+                    //do! Task.Delay(resolutionTime - timer.) |> Async.AwaitTask
+                    //Thread.Sleep(resolutionTime)
                     do! Task.Delay(resolutionTime) |> Async.AwaitTask
                 printfn "Operation was canceled!"
             with

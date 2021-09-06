@@ -212,3 +212,96 @@ module Logic =
             with
             | ex -> ex.ToString() |> printfn "%s"
         }
+
+module Logic2 =
+    let maxUInt256StringRepresentation =
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+    type Candle =
+        {
+          datetime: BigInteger
+          pair: Pair
+          resolution: int
+          _open: BigDecimal
+          high: BigDecimal
+          low: BigDecimal
+          close: BigDecimal
+          volume: uint }
+
+    type FullCandle(timeStamp: HexBigInteger, resolution: int) =
+        let mutable candle = {_open = BigDecimal(); high = BigDecimal(); low = BigDecimal(); close = BigDecimal(); volume = 0u}
+
+    let resList = [5; 10]
+
+    let initHigh = BigDecimal(0I, 0)
+    let initLow = BigDecimal.Parse maxUInt256StringRepresentation
+    let initVolume = 0u
+
+    let updateCandle timeStamp pair amounts (candle:Candle) = 
+        let currentPrice (amountIn, amountOut) = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)//tokenOut per tokenIn
+        let closePrice = (Seq.last >> currentPrice) amounts
+
+        let high, low, volume = 
+            let folder (high, low, volume) price =
+                (if high > price then high else price),
+                (if low < price then low else price),
+                (volume + 1u)
+            amounts
+            |> Seq.map currentPrice
+            |> Seq.fold folder (candle.high, candle.low, candle.volume)
+
+        {datetime = timeStamp; pair = pair; resolution = candle.resolution; _open = candle._open; high = high; low = low; volume = volume; close = closePrice}
+
+    let createCandle timeStamp pair amounts r = 
+        let currentPrice (amountIn, amountOut) = BigDecimal(amountIn, 0) / BigDecimal(amountOut, 0)//tokenOut per tokenIn
+        let openPrice = (Seq.head >> currentPrice) amounts
+        let closePrice = (Seq.last >> currentPrice) amounts
+
+        let high, low, volume = 
+            let folder (high, low, volume) price =
+                (if high > price then high else price),
+                (if low < price then low else price),
+                (volume + 1u)
+            amounts
+            |> Seq.map currentPrice
+            |> Seq.fold folder (initHigh, initLow, initVolume)
+
+        {datetime = timeStamp; pair = pair; resolution = r; _open = openPrice; high = high; low = low; volume = volume; close = closePrice}
+
+
+    let newCandles web logger blockStart = 
+        let rec loop (i:int) (candles:Candle list) = seq {
+
+            let timeStamp, transactions = Indexer.Logic.getTransactionsAsync web logger (blockStart + BigInteger(i)) |> Async.RunSynchronously
+            let pairsFromTransactions = 
+                transactions
+                |> Seq.groupBy(fun tr -> {id = 0L; token0Id = tr.token0Id; token1Id = tr.token1Id})
+
+            let updatedCandles = 
+                pairsFromTransactions
+                |> Seq.collect(fun (pair,tr) -> 
+                    let existCandles = candles |> List.filter(fun c -> c.pair = pair)
+                    let existResl = existCandles |> List.map(fun c -> c.resolution) |> List.distinct
+                    let notExistResolutions = resList |> List.except existResl
+
+                    let amounts = 
+                        tr |> Seq.map(fun tr -> 
+                            let ain = HexBigInteger tr.amountIn 
+                            let aout = HexBigInteger tr.amountOut
+                            ain.Value, aout.Value
+                        ) |> Seq.toList
+                    let newCandles = notExistResolutions |> List.map(createCandle timeStamp pair amounts )
+                    let updatedCandles = existCandles |> List.map( updateCandle timeStamp pair amounts )
+                    newCandles @ updatedCandles
+                )
+                |> Seq.toList
+
+            yield! updatedCandles
+            let nextCandles = updatedCandles |> List.filter(fun candles -> BigInteger(candles.resolution) + candles.datetime > timeStamp)
+            yield! loop (i + 1)  nextCandles
+
+        }
+
+        loop 0 []
+
+
+        

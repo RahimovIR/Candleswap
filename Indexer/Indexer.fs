@@ -112,6 +112,104 @@ module Logic =
                                                 token1Id = token1Id}
         }                                  
 
+    let getTransactionsAsync (web3:IWeb3) (logger:ILogger) (blockNumber:BigInteger) =
+        let filterSwapTransactions transactions =
+            transactions
+            |> Array.filter
+                (fun (transaction:Transaction) ->
+                    (Array.tryFind(fun address -> address = transaction.To) SwapRouterV2.addresses) <> None
+                    && transaction.Input <> "0x"
+                    && SwapRouterV2.swapFunctionIds
+                       |> Array.exists (fun func -> 
+                       transaction.Input.Contains(func)))
+
+        let rec map (transaction: Transaction) =
+            async {
+                let! receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(transaction.TransactionHash)
+                              |> Async.AwaitTask
+                if(receipt <> null)
+                then return receipt
+                else printfn "Wait receipt"
+                     do! Task.Delay(1000) |> Async.AwaitTask
+                     //Thread.Sleep(1000)
+                     return! map transaction
+            }
+
+        let filterSuccessfulTranscations transactionsWithReceipts =
+            transactionsWithReceipts
+            |> Array.filter
+                (fun tr ->
+                    let (_, (r:TransactionReceipt)) = tr
+                    r.Status.Value <> 0I)
+
+        let tryGetTransactionInfo addresses infoFunc (transaction: Transaction) =
+            if Array.contains transaction.To addresses
+            then Some infoFunc
+            else None
+
+        /// Returns Some function to obtain transaction information if transaction recipient 
+        /// matches any known.
+        let getTransactionData transaction receipt = 
+            [tryGetTransactionInfo SwapRouterV2.addresses SwapRouterV2.getInfoFromRouter] 
+            |> List.map (fun f -> f transaction)
+            |> List.tryFind Option.isSome 
+            |> Option.get
+            |> Option.map (fun f -> (f transaction receipt, transaction))
+
+        let rec getBlockOrWaitAsync (web3:IWeb3) (blockNumber:BigInteger) = 
+            async{
+                let! block = HexBigInteger blockNumber
+                             |> web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync
+                             |> Async.AwaitTask
+                
+                if block <> null
+                then return block
+                else printfn "Wait block"
+                     do! Task.Delay(2000) |> Async.AwaitTask
+                     //Thread.Sleep(2000)
+                     return! getBlockOrWaitAsync web3 blockNumber     
+            }
+
+        async{
+            //logger.LogInformation($"Start indexing {blockNumber} block")
+            printfn $"Start indexing {blockNumber} block"
+            let! block = getBlockOrWaitAsync web3 blockNumber
+
+            //do! Db.addBlockAsync connection {number = (HexBigInteger blockNumber).HexValue 
+            //                                 timestamp = block.Timestamp.HexValue}
+
+            let transactions = block.Transactions
+                               |> filterSwapTransactions
+                               
+            let! receipts = transactions
+                            |> Array.map map 
+                            |> Async.Parallel
+
+            let transactionsWithReceipts = 
+                Array.map2 (fun transaction receipt -> (transaction, receipt)) transactions receipts
+                |> filterSuccessfulTranscations
+
+            /// Extended information about transactions to Uniswap contracts.
+            let actualTransactionsData = 
+                transactionsWithReceipts
+                |> Array.map (fun (t, r) -> getTransactionData t r)
+                |> Array.choose id
+
+            
+            let transactions = 
+                actualTransactionsData |> Seq.map(fun ((token0Id, token1Id, amountIn, amountOut), transaction) -> 
+                    { hash = transaction.TransactionHash
+                      token0Id = token0Id
+                      token1Id = token1Id
+                      amountIn = (HexBigInteger amountIn).HexValue
+                      amountOut = (HexBigInteger amountOut).HexValue
+                      blockNumber = (HexBigInteger blockNumber).HexValue
+                      nonce = transaction.Nonce.HexValue}
+                )
+            return block.Timestamp.Value, transactions
+
+        }            
+
     let indexInRangeAsync web3 connection (logger:ILogger) startBlock endBlock = 
         async{
             let loop () =

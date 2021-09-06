@@ -41,28 +41,33 @@ namespace WebSocket.Uniswap.Background
         private async Task DoWork(CancellationToken cancellationToken)
         {
             //var lastBlockInBlockchain = await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
-            
             var startFrom = DateTime.UtcNow;
 
             var lastBlockNumberInBlockchain = await _logicService.GetBlockNumberByDateTimeAsync(false, startFrom);
 
-            var pancakeLauchDateTimestamp = new DateTime(2020, 9, 20, 0, 0, 0);
-
-             _indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
-                                                 0,
-                                                 FSharpOption<BigInteger>.None);
-
-             _indexerService.IndexNewBlockAsync(5);
-
-            foreach (var period in _defaultPeriods)
-                _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
-                    cancellationToken);
-
-            foreach(var period in _defaultPeriods)
+            foreach(var c in  RedDuck.Candleswap.Candles.Logic2.newCandles(_web3, _logger, lastBlockNumberInBlockchain))
             {
-                _logicService.GetCandles(_ => { }, cancellationToken, 
-                                         (startFrom, pancakeLauchDateTimestamp), TimeSpan.FromSeconds(period));
+
             }
+
+
+            //var pancakeLauchDateTimestamp = new DateTime(2020, 9, 20, 0, 0, 0);
+
+            //_indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
+            //                                     0,
+            //                                     FSharpOption<BigInteger>.None);
+
+            //_indexerService.IndexNewBlockAsync(5);
+
+            //foreach (var period in _defaultPeriods)
+            //    _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
+            //        cancellationToken);
+
+            //foreach(var period in _defaultPeriods)
+            //{
+            //    _logicService.GetCandles(_ => { }, cancellationToken, 
+            //                             (startFrom, pancakeLauchDateTimestamp), TimeSpan.FromSeconds(period));
+            //}
 
 
         }

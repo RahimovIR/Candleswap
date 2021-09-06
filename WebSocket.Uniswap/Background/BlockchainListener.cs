@@ -21,7 +21,7 @@ namespace WebSocket.Uniswap.Background
         private readonly IIndexerService _indexerService;
         private readonly IWeb3 _web3;
 
-        private readonly int[] _defaultPeriods = { 15, 60, 600 };
+        private readonly int[] _defaultPeriods = { 30, 60 };
 
         public BlockchainListener(ILogger<BlockchainListener> logger, ILogicService logicService,
                                   IIndexerService indexerService, IWeb3 web3)
@@ -48,20 +48,23 @@ namespace WebSocket.Uniswap.Background
 
             var pancakeLauchDateTimestamp = new DateTime(2020, 9, 20, 0, 0, 0);
 
+            var events = new Dictionary<(DateTime, DateTime), AutoResetEvent>();
+
              _indexerService.IndexInRangeParallel(lastBlockNumberInBlockchain.Value,
                                                  0,
                                                  FSharpOption<BigInteger>.None);
 
              _indexerService.IndexNewBlockAsync(5);
 
-            foreach (var period in _defaultPeriods)
-                _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
-                    cancellationToken);
-
             foreach(var period in _defaultPeriods)
             {
+                var timeSamples =  _logicService.GetTimeSamples((startFrom, pancakeLauchDateTimestamp), TimeSpan.FromSeconds(period));
+                foreach (var timeSample in timeSamples)
+                    events.Add(timeSample, new AutoResetEvent(false));
                 _logicService.GetCandles(_ => { }, cancellationToken, 
                                          (startFrom, pancakeLauchDateTimestamp), TimeSpan.FromSeconds(period));
+                _logicService.GetCandle(WebSocketConnection.OnCandleUpdateReceived, TimeSpan.FromSeconds(period),
+                    cancellationToken);
             }
 
 

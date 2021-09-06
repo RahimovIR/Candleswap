@@ -73,6 +73,7 @@ module Logic =
         startBlockNumber
         endBlockNumber
         resolution
+        (events: Dictionary<(BigInteger*BigInteger), AutoResetEvent>)
         =
 
         let rec getBlockFromDbOrDelayWhileNotIndexedAsync connection blockNumber = 
@@ -88,7 +89,7 @@ module Logic =
 
         async {
             printfn "New pass"
-
+            
             let! startBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection startBlockNumber
                               
             let! endBlock = getBlockFromDbOrDelayWhileNotIndexedAsync connection endBlockNumber 
@@ -141,7 +142,7 @@ module Logic =
             return! sendCallbackAndWriteToDBAsync connection pairsWithDbCandles callback
         }
 
-    let getCandle connection (web3:IWeb3) callback (resolutionTime: TimeSpan) (cancelToken:CancellationToken) =
+    let getCandle connection (web3:IWeb3) callback (resolutionTime: TimeSpan) (cancelToken:CancellationToken) (event:AutoResetEvent) =
        
         
         async{
@@ -154,7 +155,7 @@ module Logic =
                     let lastRecordedBlocNumber = HexBigInteger lastRecordedBlock.number
                     let! lastBlockNumberInBlockchain = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
                                                        |> Async.AwaitTask
-
+                    //event.WaitOne() |> ignore                                 
                     do! (int)resolutionTime.TotalSeconds
                         |> buildCandleSendCallbackAndWriteToDBAsync connection callback
                                                                     lastBlockNumberInBlockchain

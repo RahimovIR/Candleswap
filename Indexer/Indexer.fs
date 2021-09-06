@@ -12,6 +12,7 @@ open System
 open Dater
 open System.Threading.Tasks
 open System.Threading
+open System.Collections.Generic
 
 module Logic = 
 
@@ -129,7 +130,7 @@ module Logic =
 
     ///Indexing from the end of blockchain to the beginning
     ///start block-inclusive endBlock-noninclusive
-    let indexInRangeParallel connection web3 (logger:ILogger) startBlock endBlock stepOption =
+    let indexInRangeParallel connection web3 (logger:ILogger)  startBlock endBlock stepOption (events: Dictionary<(BigInteger*BigInteger), AutoResetEvent>) =
         async{
             if startBlock < endBlock 
             then logger.LogError $"startBlock({startBlock}) must be grater than endBlock({endBlock})"
@@ -147,6 +148,8 @@ module Logic =
                                 then do! indexInRangeAsync web3 connection logger 
                                                            i (i - step)
                                      //|> Async.StartAsTask
+                                     events.Add((i, i - step), new AutoResetEvent(true))
+                                     events.[(i, i - step)].Set() |> ignore
                                      do! inner (i - step) (j - 1I)
                             }
                         do! inner startBlock steps
@@ -176,15 +179,16 @@ module Logic =
                       return! getLastRecordedBlockOrWaitWhileNotIndexed connection      
         }
 
-    let indexNewBlocksAsync connection (web3:IWeb3) logger (checkingForNewBlocksPeriod:int) =
-        
+    let indexNewBlocksAsync connection (web3:IWeb3) logger (checkingForNewBlocksPeriod:int) events =
+        let timeSpanPeriod = TimeSpan.FromSeconds((float)checkingForNewBlocksPeriod)
         async{
+            do! Task.Delay(timeSpanPeriod) |> Async.AwaitTask
             while true do
                 let! lastRecordedBlock = getLastRecordedBlockOrWaitWhileNotIndexed connection
                 let! lastBlockInBlockchain = web3.Eth.Blocks.GetBlockNumber.SendRequestAsync()
                                              |> Async.AwaitTask
                 do! indexInRangeParallel connection web3 logger lastBlockInBlockchain.Value 
-                                         (HexBigInteger lastRecordedBlock.number).Value None
+                                         (HexBigInteger lastRecordedBlock.number).Value None events
                 do! Task.Delay(checkingForNewBlocksPeriod) |> Async.AwaitTask
                 //Thread.Sleep(checkingForNewBlocksPeriod)
         }

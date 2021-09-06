@@ -21,7 +21,7 @@ namespace WebSocket.Uniswap.Background
         private readonly IIndexerService _indexerService;
         private readonly IWeb3 _web3;
 
-        private readonly int[] _defaultPeriods = { 10, 15, 60, 240, 480, 960 };
+        private readonly int[] _defaultPeriods = { 15, 60, 600 };
 
         public BlockchainListener(ILogger<BlockchainListener> logger, ILogicService logicService,
                                   IIndexerService indexerService, IWeb3 web3)

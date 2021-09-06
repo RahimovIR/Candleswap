@@ -53,16 +53,18 @@ namespace WebSocket.Uniswap.Controllers
             if (pair == null)
                 return BadRequest("There is now such pair");
 
+            if (limit > 3000)
+                return BadRequest("Limit max = 3000");
+
             startTime ??= new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds() - 60;
             endTime ??= new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
-            limit ??= 10;
+            limit ??= 100;
 
-            var candles = await _candleStorage.FetchCandlesAsync(pair.id, periodSeconds);
+            var candles = 
+                await _candleStorage.FetchCandlesAsync(pair.id, periodSeconds, startTime.Value, 
+                                                       endTime.Value, limit.Value);
 
-            return candles
-                .Where(c => c.datetime >= startTime && c.datetime <= endTime)
-                .OrderByDescending(c => c.datetime)
-                .Take(limit.Value);
+            return !candles.Any() ? BadRequest("There is no any candle for these tokens with such period in this interval") : candles;
         }
     }
 }

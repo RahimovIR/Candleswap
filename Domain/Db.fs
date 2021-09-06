@@ -8,8 +8,12 @@ open Types
 open Nethereum.Hex.HexTypes
 
 module Db = 
-    let private fetchCandlesSql = @"select datetime, resolutionSeconds, pairId, [open] as _open, high, low, [close], volume from candles
-        where pairId = @pairId and resolutionSeconds = @resolutionSeconds"
+    let private fetchCandlesSql = 
+        "select top (@limit) datetime, resolutionSeconds, pairId, [open] as _open, high, low, [close], volume " +
+        "from candles " +
+        "where pairId = @pairId and resolutionSeconds = @resolutionSeconds " +
+        "and datetime >= @startTime and datetime <= @endTime " +
+        "order by datetime desc"
 
     let private insertCandleSql =
         "insert into candles(datetime, resolutionSeconds, pairId, [open], high, low, [close], volume) "
@@ -85,7 +89,7 @@ module Db =
 
     let private dbExecute (connection: SqlConnection) (sql: string) (data: _) = connection.ExecuteAsync(sql, data)
 
-    let fetchCandles connection pairId (resolutionSeconds: int) =
+    let fetchCandles connection pairId (resolutionSeconds: int) startTime endTime limit =
         async {
             let! candles =
                 Async.AwaitTask
@@ -94,14 +98,17 @@ module Db =
                     fetchCandlesSql
                     (Some(
                         dict [ "pairId" => pairId
-                               "resolutionSeconds" => resolutionSeconds ]
+                               "resolutionSeconds" => resolutionSeconds
+                               "startTime" => startTime
+                               "endTime" => endTime
+                               "limit" => limit]
                     ))
 
             return candles
         }
 
-    let fetchCandlesTask connection pairId (resolutionSeconds: int) =
-        fetchCandles connection pairId resolutionSeconds
+    let fetchCandlesTask connection pairId (resolutionSeconds: int) startTime endTime limit  =
+        fetchCandles connection pairId resolutionSeconds startTime endTime limit
         |> Async.StartAsTask
 
     let addCandle connection candle =

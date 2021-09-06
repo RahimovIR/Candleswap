@@ -128,7 +128,7 @@ module Logic =
     let indexInRangeParallel connection web3 (logger:ILogger) startBlock endBlock stepOption =
         async{
             if startBlock < endBlock 
-            then logger.LogError "startBlock must be grater than endBlock"
+            then logger.LogError $"startBlock({startBlock}) must be grater than endBlock({endBlock})"
             else
                 let step = if Option.isNone stepOption then 20I else stepOption.Value
 

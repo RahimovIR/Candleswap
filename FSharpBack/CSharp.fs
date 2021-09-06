@@ -105,7 +105,10 @@ type ICandleStorageService =
     abstract AddCandleAsync: Candle -> Task
     abstract FetchCandlesAsync: 
         pairId: int64 ->
-        resolutionSeconds: int -> 
+        resolutionSeconds: int ->
+        startTime: int64 ->
+        endTime: int64 -> 
+        limit: int ->
         Task<seq<DbCandle>>
     abstract FetchPairsAsync: unit -> Task<seq<Pair>>
     abstract AddPairAsync: Pair -> Task
@@ -122,8 +125,9 @@ type CandleStorageService(sql: ISqlConnectionProvider) =
         member _.AddCandleAsync candle = 
             Db.addCandle connection candle |> Async.StartAsTask :> Task
         
-        member _.FetchCandlesAsync pairId resolutionSeconds = 
-            Db.fetchCandles connection pairId resolutionSeconds |> Async.StartAsTask
+        member _.FetchCandlesAsync pairId resolutionSeconds startTime endTime limit = 
+            Db.fetchCandles connection pairId resolutionSeconds startTime endTime limit
+            |> Async.StartAsTask
 
         member _.FetchPairsAsync () = 
             Db.fetchPairsAsync connection |> Async.StartAsTask

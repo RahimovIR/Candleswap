@@ -47,7 +47,7 @@ namespace WebSocket.Uniswap.Background
 
             foreach(var c in  RedDuck.Candleswap.Candles.Logic2.newCandles(_web3, _logger, lastBlockNumberInBlockchain))
             {
-
+                System.Console.WriteLine($"{c.datetime} {c.resolution} {c.pair.token0Id} {c.pair.token1Id} {c.volume}");
             }
 
 
